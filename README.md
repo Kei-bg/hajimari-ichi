@@ -10,7 +10,7 @@
 npm start        # http://localhost:5173
 ```
 
-スマホでは GitHub Pages の公開版を開く(`main` に push すると自動で更新)。ブラウザの「ホーム画面に追加」でアプリのように開ける。
+スマホでは公開版 https://kei-bg.github.io/hajimari-ichi/ を開く(`main` に push すると自動で更新)。ブラウザの「ホーム画面に追加」でアプリのように開ける。
 
 ## バランスの確認
 

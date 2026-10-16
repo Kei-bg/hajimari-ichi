@@ -16,7 +16,7 @@
 
 ## 公開(スマホで遊ぶ)
 
-- GitHub Pages で公開している。`main` に push すると `.github/workflows/pages.yml` が動き、1〜2分で公開版に反映される
+- GitHub Pages で公開している: https://kei-bg.github.io/hajimari-ichi/ (リポジトリ `Kei-bg/hajimari-ichi`、公開リポジトリ)。`main` に push すると `.github/workflows/pages.yml` が動き、1〜2分で公開版に反映される
 - **変更がひと区切りついたら commit して push する**(スマホの公開版に反映するため)。経済まわりなら push 前に sim を回す
 - 公開時に `index.html` の `?v=dev` がコミットIDに置き換わる(古い JS/CSS が残らないように)。`<script>`/`<link>` を足すときも `?v=dev` を付ける
 - 公開するファイルは workflow の `cp` の行で決めている。トップに新しいファイルやフォルダを足したらそこにも足す
