@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>はじまりの市</title>
+<meta name="theme-color" content="#E6E9E1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#131817" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="はじまりの市">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@600;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="src/style.css?v=dev">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <h1>はじまりの市</h1>
+      <p>素手から道具を考え、土地を拓き、物を換える。その先に「お金」が生まれる。</p>
+    </div>
+    <div class="status" id="status"></div>
+    <div class="controls">
+      <span class="barinfo" id="barinfo"></span>
+      <button class="btn primary" id="end">日を終える</button>
+      <button class="btn" id="auto" aria-pressed="false">おまかせで進める</button>
+    </div>
+  </header>
+
+  <div class="grid">
+    <div class="col">
+      <section class="panel" id="card" hidden></section>
+      <section class="panel" id="you"></section>
+      <section class="panel" id="land" hidden></section>
+      <section class="panel" id="work" hidden></section>
+      <section class="panel" id="bench" hidden></section>
+      <section class="panel" id="rares" hidden></section>
+    </div>
+    <div class="col">
+      <section class="panel">
+        <h2>市場 <small>今日あなたに声をかけてきた人</small></h2>
+        <div class="offers" id="offers"></div>
+        <h3>いま村で足りない物</h3>
+        <div class="rumor" id="demand"></div>
+        <h3>自分から持ちかける</h3>
+        <div class="propose">
+          <select id="pGive" aria-label="出すもの"></select>
+          <input id="pAmt" type="number" min="0.1" step="0.1" value="1" aria-label="量">
+          <span>を出して</span>
+          <select id="pWant" aria-label="欲しいもの"></select>
+          <span>が欲しい</span>
+          <button class="btn small" id="pGo">相手を探す</button>
+        </div>
+        <div id="pMsg"></div>
+      </section>
+      <section class="panel">
+        <h2>お金の芽 <small>交換の仲立ちとしての通用度</small></h2>
+        <p class="lead" id="moneyLead"></p>
+        <div class="money" id="money"></div>
+      </section>
+      <section class="panel">
+        <h2>物価 <small id="unitNote"></small></h2>
+        <div class="prices" id="prices"></div>
+        <div class="chartbox"><canvas id="chart" aria-label="物価の推移"></canvas></div>
+        <div class="legend" id="legend"></div>
+      </section>
+      <section class="panel">
+        <h2>年代記</h2>
+        <ul class="log" id="log"></ul>
+      </section>
+      <section class="panel">
+        <h2>村人 <small id="popNote"></small></h2>
+        <div class="vtable"><table id="vt"></table></div>
+        <div class="confirm" id="resetBox"></div>
+      </section>
+    </div>
+  </div>
+</div>
+<div class="over" id="over" hidden></div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+<script src="src/game.js?v=dev"></script>
+</body>
+</html>

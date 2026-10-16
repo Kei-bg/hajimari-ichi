@@ -1,0 +1,16 @@
+{
+  "name": "はじまりの市",
+  "short_name": "はじまりの市",
+  "description": "何もない古代から経済が生まれるシミュレーション",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#E6E9E1",
+  "theme_color": "#1D2528",
+  "lang": "ja",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

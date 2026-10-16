@@ -1,0 +1,11 @@
+{
+  "name": "hajimari-ichi",
+  "version": "0.4.0",
+  "private": true,
+  "description": "はじまりの市 — 何もない古代から経済が生まれるブラウザ・シミュレーション(プロトタイプ)",
+  "type": "module",
+  "scripts": {
+    "start": "npx --yes serve -l 5173 .",
+    "sim": "node tools/simulate.mjs 4 120"
+  }
+}
