@@ -608,10 +608,15 @@ function propose(){
   logIt(`あなたは${best.a.name}と取引し、${ITEMS[gG].name}${q(gG,best.pay)}で${ITEMS[wG].name}${q(wG,best.get)}を得た。`,'you');
   save();render();
 }
+/* 教えられるのは覚えた道具の型と、2段目からの加工だけ。縄・石刃のような誰でも思いつく物は教えても礼にならない */
+const teachable=id=>isDesign(id)||(!!RID[id]&&!RID[id].auto&&RID[id].tier>=2);
 function teachOffer(rid){
+  if(!teachable(rid)||player().labor<1)return;
   const des=isDesign(rid),r=RID[rid];let best=null;
+  /* 村で知っている人が多いほど、教わる値打ちは下がる */
+  const rare=1-ais().filter(a=>des?a.known.includes(rid):knows(a,rid)).length/Math.max(1,ais().length);
   for(const a of ais()){if(des?a.known.includes(rid):(knows(a,rid)||(r.needs&&!hasFac(a,r.needs))))continue;computeWant(a);
-    let kv=des?toolUse(a,rid)*.6:Math.max(0,agentVal(a,r.out)-Object.entries(r.in).reduce((s,[g,n])=>s+n*S.prices[g],0))*3;
+    let kv=(des?toolUse(a,rid)*.6:Math.max(0,agentVal(a,r.out)-Object.entries(r.in).reduce((s,[g,n])=>s+n*S.prices[g],0))*3)*rare;
     const pv=kv*.5;if(pv<.5)continue;
     const g=GOODS.filter(g=>surplus(a,g)>.1).sort((x,y)=>S.money[y]-S.money[x]||S.prices[y]-S.prices[x])[0];if(!g)continue;
     const raw=Math.min(surplus(a,g),pv/S.prices[g]*(1+.1*titleLv())),amt=whole(g)?Math.floor(raw):Math.floor(raw*10)/10;if(amt<(whole(g)?1:.1))continue;
@@ -619,8 +624,8 @@ function teachOffer(rid){
   }
   S.ui.teach=best||{none:true,rid};render();
 }
-function doTeach(){const t=S.ui.teach,P=player(),a=S.agents.find(x=>x.id===t.aid);if(!a)return;
-  take(a,t.g,t.amt);add(P,t.g,t.amt);a.known.push(t.rid);S.stat.teach++;addFame(3);
+function doTeach(){const t=S.ui.teach,P=player(),a=S.agents.find(x=>x.id===t.aid);if(!a||P.labor<1)return;
+  take(a,t.g,t.amt);add(P,t.g,t.amt);a.known.push(t.rid);P.labor--;S.stat.teach++;addFame(3);
   logIt(`あなたは${a.name}に${nameOf(t.rid)}の作り方を教え、${ITEMS[t.g].name}${q(t.g,t.amt)}を受け取った。`,'you');
   S.ui.teach=null;save();render()}
 function act(fn,expOk){const P=player();if(P.health<=0)return;if(!expOk&&S.ui.exp&&!S.ui.exp.done){toast('遠出の途中だ。先に引き返そう。','bad');return}fn(P);unlockHold(P);save();render()}
@@ -983,14 +988,14 @@ function renderBench(P){
   const notes=[];if(d.jobs.dig)notes.push(d.jobs.dig>=2?'畑と水路が労力1で作れる':'畑と水路が作れる');if(d.jobs.hunt)notes.push('獣狩りで有利');
   const book=P.known.filter(isDesign).map(k=>{const t=ITEMS[k],w=designWhy(P,k);
     return `<div class="rec"><div><div class="rf">${gl(k)}<b>${t.name}</b>${cnt(P,k)>=1?`<span class="tag">手元${cnt(P,k)}</span>`:''}</div><div class="rd">${Object.entries(t.jobs).map(([j,v])=>JOBL[j]+powTxt(j,v)).join('・')}・もち${t.dur}回 / ${Object.entries(t.mat).map(([g,n])=>ITEMS[g].name+q(g,n)).join('・')}</div></div>
-    <div class="rb"><button class="btn small" data-mk="${k}" ${w?'disabled':''}>作る</button><button class="btn small" data-load="${k}">台に載せる</button><button class="btn small" data-teach="${k}">教える</button></div></div>`}).join('');
+    <div class="rb"><button class="btn small" data-mk="${k}" ${w?'disabled':''}>作る</button><button class="btn small" data-load="${k}">台に載せる</button><button class="btn small" data-teach="${k}" ${P.labor<1?'disabled':''}>教える</button></div></div>`}).join('');
   const procs=RECIPES.filter(r=>knows(P,r.id)).map(r=>{const w=craftWhy(P,r),n=recipeOut(P,r);
     return `<div class="rec"><div><div class="rf">${costHtml(recipeIn(P,r))} → ${gl(r.out)}<b>${ITEMS[r.out].name}${n>1?'×'+n:''}</b>${r.needs?'<span class="tag">窯</span>':''}</div><div class="rd">${w&&w!=='労力が残っていない'?w:r.short}</div></div>
-    <div class="rb"><button class="btn small" data-craft="${r.id}" ${w?'disabled':''}>作る</button>${r.auto?'':`<button class="btn small" data-teach="${r.id}">教える</button>`}</div></div>`}).join('');
+    <div class="rb"><button class="btn small" data-craft="${r.id}" ${w?'disabled':''}>作る</button>${teachable(r.id)?`<button class="btn small" data-teach="${r.id}" ${P.labor<1?'disabled':''}>教える</button>`:''}</div></div>`}).join('');
   const others=Object.entries(S.designs).filter(([k])=>!P.known.includes(k)).map(([k,v])=>`<span>${gl(k,1)} ${ITEMS[k].name}(${v.by})</span>`).join('');
   const t=S.ui.teach;let teach='';
   if(t){if(t.none)teach=`<div class="msg">${nameOf(t.rid)}の作り方を教わりたい人は今いない。みんな知っているか、払える物がない。</div>`;
-    else{const a=S.agents.find(x=>x.id===t.aid);teach=`<div class="msg win">${a.name}が${ITEMS[t.g].name}${q(t.g,t.amt)}を払うので、${nameOf(t.rid)}の作り方を教えてほしいと言っている。教えると、${a.name}も自分で作れるようになる。<div class="confirm" style="margin-top:6px"><button class="btn small" id="teachYes">教える</button><button class="btn small" id="teachNo">断る</button></div></div>`}}
+    else{const a=S.agents.find(x=>x.id===t.aid);teach=`<div class="msg win">${a.name}が${ITEMS[t.g].name}${q(t.g,t.amt)}を払うので、${nameOf(t.rid)}の作り方を教えてほしいと言っている。教えるには労力1がかかり、${a.name}も自分で作れるようになる。<div class="confirm" style="margin-top:6px"><button class="btn small" id="teachYes">教える</button><button class="btn small" id="teachNo">断る</button></div></div>`}}
   $('bench').innerHTML=`<h2>道具づくり <small>先端・柄・結びを選んで組み立てる・労力1</small></h2>
     <p class="note">素材にはそれぞれ性質がある。先端の形で道具の働きが決まり、柄と結びで力の乗り方ともちが変わる。持っていない素材も選んで性能を確かめられる。</p>
     <h3>1 先端の素材</h3><div class="wbrow">${heads}</div>
