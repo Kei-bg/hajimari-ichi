@@ -147,7 +147,9 @@ function freshWorld(){
   for(const g of ORDER){S.prices[g]=ITEMS[g].base;S.money[g]=.04}
   S.agents.push(newAgent(null,true));
   for(const r of['plain','plain','river','river','coast','coast','forest','forest'])S.agents.push(newAgent(r,false));
-  logIt('何もない土地に、8人の人々が暮らしている。道具はまだなく、誰もが素手で木の実や草を集めている。','event');
+  /* 縄をなう・石を打ち欠くくらいは、手元の材料で誰でも知っている */
+  for(const a of ais())for(const r of inspire(a))S.firstBy[r.id]=S.firstBy[r.id]||a.name;
+  logIt('何もない土地に、8人の人々が暮らしている。道具はまだなく、誰もが素手で木の実や草を集めている。縄をなうことと、石を打ち欠くことくらいは誰でも知っている。','event');
   pushHist();
 }
 const player=()=>S.agents.find(a=>a.isPlayer);
@@ -402,13 +404,12 @@ function aiLearn(){
       /* あなたが考え出した型が広まると、名声が上がる */
       if(S.designs[bk].by==='あなた')addFame(1)}}
   }
-  for(const a of ais())for(const r of RECIPES){
-    if(r.auto||a.known.includes(r.id))continue;if(r.needs&&!hasFac(a,r.needs))continue;
-    const k=S.agents.filter(o=>o!==a&&o.known.includes(r.id)).length;
-    let p=k?Math.min(.25,.015*k):0;
-    if(Object.keys(r.in).every(g=>cnt(a,g)>0))p+=[0,.02,.008,.004][r.tier];
-    if(Math.random()<p){a.known.push(r.id);
-      if(!S.firstBy[r.id]){S.firstBy[r.id]=a.name;logIt(`${a.name}が${ITEMS[r.out].name}の作り方を考え出した。${r.short}`,'tech')}}
+  for(const a of ais()){
+    for(const r of inspire(a))if(!S.firstBy[r.id]){S.firstBy[r.id]=a.name;logIt(`${a.name}が${ITEMS[r.out].name}の作り方を考え出した。${r.short}`,'tech')}
+    /* 材料を持っていなくても、知っている人が多ければ見よう見まねで覚える */
+    for(const r of RECIPES){if(r.auto||a.known.includes(r.id)||(r.needs&&!hasFac(a,r.needs)))continue;
+      const k=S.agents.filter(o=>o!==a&&o.known.includes(r.id)).length;
+      if(k&&Math.random()<Math.min(.25,.015*k))a.known.push(r.id)}
   }
 }
 
@@ -565,11 +566,15 @@ function pushHist(){S.hist.push({d:S.day,p:{...S.prices}});if(S.hist.length>150)
 function moneyGood(){let g=null,v=0;for(const k of GOODS)if(S.money[k]>v){v=S.money[k];g=k}return{g,v}}
 
 /* ================= プレイヤーの操作 ================= */
+/* 材料をひと通り手にすると、その加工を思いつく(あなたも村人も同じ) */
+function inspire(a){const got=[];
+  for(const r of RECIPES){if(r.auto||a.known.includes(r.id)||(r.needs&&!hasFac(a,r.needs)))continue;
+    if(Object.keys(r.in).every(g=>cnt(a,g)>0)){a.known.push(r.id);got.push(r)}}
+  return got}
 function unlockHold(P){if(!P.region)return;
-  for(const r of RECIPES){if(r.auto||P.known.includes(r.id)||(r.needs&&!hasFac(P,r.needs)))continue;
-    if(Object.keys(r.in).every(g=>cnt(P,g)>0)){P.known.push(r.id);
-      if(!S.firstBy[r.id]){S.firstBy[r.id]='あなた';logIt(`あなたが${ITEMS[r.out].name}の作り方を思いついた。村で初めてだ。`,'tech')}
-      toast(`<b>ひらめき!</b> ${Object.keys(r.in).map(g=>ITEMS[g].name).join('と')}から${ITEMS[r.out].name}が作れそうだ`,'good',3600)}}}
+  for(const r of inspire(P)){
+    if(!S.firstBy[r.id]){S.firstBy[r.id]='あなた';logIt(`あなたが${ITEMS[r.out].name}の作り方を思いついた。村で初めてだ。`,'tech')}
+    toast(`<b>ひらめき!</b> ${Object.keys(r.in).map(g=>ITEMS[g].name).join('と')}から${ITEMS[r.out].name}が作れそうだ`,'good',3600)}}
 const nameOf=id=>isDesign(id)?ITEMS[id].name:ITEMS[RID[id].out].name;
 function chooseRegion(r){const P=player();P.region=r;P.plot=makePlot(r);unlockHold(P);
   logIt(`あなたは${REG[r].name}に住みついた。手元にあるのは少しの木の実と穀物、木切れと石だけだ。`,'you');

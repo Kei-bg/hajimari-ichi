@@ -35,12 +35,16 @@ for (let k = 0; k < __RUNS; k++) {
   freshWorld();
   chooseRegion(__REGION || ['plain','river','coast','forest'][k % 4]);
   autoTimer = 1; // プレイヤーもおまかせで動かす
-  let callDays = 0, calls = 0;
+  let callDays = 0, calls = 0, know10 = '';
+  // 村人(プレイヤー以外)のうち、作り方を知っている人の数
+  const knowLine = () => { const A = live().filter(a => !a.isPlayer);
+    return RECIPES.filter(r => !r.auto).map(r => ITEMS[r.out].name + (r.id.startsWith('neck') ? '(' + r.id.slice(5) + ')' : '') + A.filter(a => a.known.includes(r.id)).length + '/' + A.length).join(' '); };
   for (let d = 0; d < __DAYS; d++) {
     if (player().health <= 0) player().health = 100;
     if (S.card) { const o = S.card.opts.find(o => !o.plain && !o.dis) || S.card.opts[0]; resolveCard(o.id); }
     endDay();
     if (S.offers.length) { callDays++; calls += S.offers.length; }
+    if (d === 9) know10 = knowLine();
   }
   const L = live();
   const avg = f => Math.round(L.reduce((s, a) => s + f(a), 0) / L.length);
@@ -56,6 +60,7 @@ for (let k = 0; k < __RUNS; k++) {
   console.log('  物価(穀物=1) ' + ['fish','salt','wood','pot','copper','pearl','gold'].map(g => ITEMS[g].name + (S.prices[g] / S.prices.grain).toFixed(1)).join(' '));
   console.log('  声かけ ' + callDays + '/' + __DAYS + '日 (計' + calls + '件)  肩書き ' + TITLES[player().title].name + ' 名声' + Math.round(player().fame)
     + '  あゆみ ' + Object.keys(S.ayumi).length + '/' + AYUMI.length);
+  console.log('  村人の作り方 10日目: ' + know10 + '  →  ' + __DAYS + '日目: ' + knowLine());
   console.log('  大事業 ' + (Object.keys(WORKS).filter(w => S.works[w]).map(w => WORKS[w].name + (S.works[w].done ? ' ' + S.works[w].start + '→' + S.works[w].done + '日' : '(普請中)')).join(' / ') || 'なし'));
   for (const a of L) for (const t of TOOLS) if (cnt(a, t) !== ((a.durs[t] || []).length)) console.log('  !! 耐久の数が合わない: ' + a.name + ' ' + t);
 }
