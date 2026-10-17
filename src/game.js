@@ -471,8 +471,9 @@ function consume(a){
   let eaten=0;const kinds=new Set();
   for(const g of FOOD){const t=Math.min(cnt(a,g),2-eaten);if(t>0){take(a,g,t);eaten+=t;if(t>=.5)kinds.add(g)}if(eaten>=2)break}
   let dh=eaten<1.95?-(2-eaten)*11:2;if(kinds.size>=2)dh+=2;if(cnt(a,'necklace')>=1)dh+=1;
-  if(cnt(a,'salt')>=.2)take(a,'salt',.2);else{a.inv.salt=0;dh-=4}
-  if(cnt(a,'wood')>=.3)take(a,'wood',.3);else{a.inv.wood=0;dh-=3}
+  /* 塩と木材は手元にある分を使い、足りない分に応じて体力が減る */
+  const salt=Math.min(cnt(a,'salt'),.2),wood=Math.min(cnt(a,'wood'),.3);
+  take(a,'salt',salt);take(a,'wood',wood);dh-=4*(.2-salt)/.2+3*(.3-wood)/.3;
   a.health=Math.max(0,Math.min(100,a.health+dh));
 }
 function decay(a){
