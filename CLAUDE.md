@@ -10,10 +10,37 @@
 - ブラウザで遊ぶ: `index.html` を直接開くか、`npm start`(`npx serve` で http://localhost:5173)
 - バランスを数値で確かめる: `npm run sim`(= `node tools/simulate.mjs 4 120`)
   - 引数: `node tools/simulate.mjs [村の数] [日数] [--seed-region=plain|river|coast|forest]`
-  - この PC には node が無い。VS Code 同梱の Electron を node として使える: `ELECTRON_RUN_AS_NODE=1 "/c/Users/user/AppData/Local/Programs/Microsoft VS Code/Code.exe" tools/simulate.mjs 4 120`
   - プレイヤーも「おまかせ」で動かし、村ごとに人口・体力・畑・道具・お金の主役・物価・声かけの日数・肩書き・あゆみ・大事業の進み方を出す
   - **経済まわりを変えたら、必ず sim を回して前後を比べる**(1村120日でおよそ2秒)
+- 文字版で遊ぶ(AI のテストプレイ用): `sh tools/play.sh <保存ファイル> new|look|press|trade|auto ...`。決まりと感想の書式は `docs/PLAYTEST.md`、遊び手の人物像は `.claude/agents/playtester-*.md`
 - ビルド工程・依存パッケージはない。素の HTML / CSS / JavaScript。
+- node の無い環境での動かし方は、下の「作業する場所」を見る。
+
+## 作業する場所(PC とスマホ)
+
+PC(Windows の Claude Code)と、外出先のスマホ(Claude Code on the web / Claude アプリ)の両方で開発している。どちらも GitHub の `Kei-bg/hajimari-ichi` を通じてつながる。
+
+### どこでも守ること
+
+- **作業を始める前に main を最新にする**(`git pull`)。もう一方の場所で入った変更を取り込んでから手を付ける
+- ひと区切りついたら **main に入れて push する**(GitHub Pages の公開版はここから作られる)。作業用のブランチにいるなら、main に取り込んでから push する。main へ直接 push できないときは PR を作り、ユーザーにスマホの GitHub アプリなどでマージしてもらう
+- 経済まわりを変えたら、push の前に sim を回す
+
+### PC(Windows)
+
+- node / python が入っていない。VS Code 同梱の Electron を node として使う:
+  `ELECTRON_RUN_AS_NODE=1 "$LOCALAPPDATA/Programs/Microsoft VS Code/Code.exe" tools/simulate.mjs 4 120`
+  (`tools/play.sh` は node が無ければ自動でこれを使う)
+- gh は `C:\Program Files\GitHub CLI\gh.exe`(古いシェルでは PATH に無い)。push したら `gh run list --limit 1` で公開の成功を確かめる
+- 画面の見た目は Edge のヘッドレスで撮れる(`msedge --headless=new --screenshot=... --window-size=幅,高さ`)。ただし描画幅は最小504pxで、それより狭いスマホ幅は確かめられない
+- テストプレイの感想の保存先は Obsidian の vault: `G:\My Drive\claude_obsidian\はじまりの市 テストプレイ\`(Google ドライブ)。`docs/playtest/` に感想が残っていたら、vault に移してリポジトリからは消す
+- スマホの Remote Control で PC のセッションを操作しているときも、PC の扱いになる
+
+### クラウド(スマホの Claude Code on the web / Claude アプリ)
+
+- node がある。`npm run sim`、`node tools/simulate.mjs`、`sh tools/play.sh`(中で node を使う)がそのまま動く
+- Obsidian の vault は見えない。テストプレイの感想は `docs/playtest/<日付> <人物像>.md` に置いて commit する(あとで PC から vault に移す)。リポジトリは公開なので、個人的なことは書かない
+- PC にだけある Claude のメモ(メモリ)は読めない。ここに書いていない決まりがあれば、ユーザーに確かめる
 
 ## 公開(スマホで遊ぶ)
 
@@ -33,7 +60,10 @@ manifest.webmanifest, icons/  ホーム画面に追加したとき用
 src/style.css       見た目。色はすべて :root のトークン、ダークモードは2ブロックで上書き
 src/game.js         ゲームのすべて(定義・状態・シミュレーション・AI・描画・入力)
 tools/simulate.mjs  ヘッドレス実行。node:vm で game.js を読み、DOM をスタブして回す
+tools/play.mjs      文字版の画面と操作(ブラウザ版と同じ描画を文字にし、ボタンを番号で押す)。tools/play.sh で起動
 docs/DESIGN.md      ゲームデザインと数値の一覧
+docs/PLAYTEST.md    AI のテストプレイの決まりと感想の書式
+.claude/agents/     テストプレイの遊び手(一般の人・学生・時間のない社会人・ゲーマー)
 ```
 
 ## コードの地図(src/game.js)
