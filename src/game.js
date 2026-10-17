@@ -75,11 +75,11 @@ const FAC={
 };
 /* 村の大事業: 材料と人手(labor)を村じゅうで持ち寄って建てる。rare は珍品なら何でもよい */
 const WORKS={
-  well:{name:'井戸',ch:'井',need:{stone:10,wood:4,rope:2,pot:2,labor:6},desc:'日照りでも水が絶えない。',effect:'干ばつと熱病の害が半分になる。',hint:'8日目を過ぎると話が出る',open:()=>S.day>=8},
-  storehouse:{name:'共同の倉',ch:'蔵',need:{wood:14,clay:10,rope:3,labor:8},desc:'村の蓄えを一か所で守る。',effect:'村じゅうの食べ物の傷みが2割減り、獣の群れの害も半分になる。',hint:'誰かが倉を建てるか、15日目を過ぎると話が出る',open:()=>S.day>=15||!!S.flags.fac_granary},
-  square:{name:'市の広場',ch:'市',need:{stone:14,wood:8,clay:6,labor:8},desc:'人と品物が集まる場所。',effect:'村人どうしの取引が増え、旅の商人もよく来る。あなたに声もかかりやすくなる。',hint:'何かが交換の仲立ちに使われるか、20日目を過ぎると話が出る',open:()=>S.day>=20||Object.keys(S.flags).some(k=>k.startsWith('ind_'))},
-  bridge:{name:'橋',ch:'橋',need:{wood:18,stone:8,rope:5,labor:10},desc:'川向こうの奥地へ渡れる。',effect:'遠出で危険に遭いにくくなる。',hint:'25日目を過ぎると話が出る',open:()=>S.day>=25},
-  shrine:{name:'社',ch:'社',need:{stone:12,wood:6,clay:6,rare:3,labor:8},desc:'珍品を供えて祀る。',effect:'吉兆の仕事がさらに実り(1.5倍→1.8倍)、珍品も出やすくなる。お守りも長くもつ。',hint:'10日目を過ぎて珍品が見つかっているか、30日目を過ぎると話が出る',open:()=>(S.day>=10&&RARES.some(g=>S.found[g]))||S.day>=30},
+  well:{name:'井戸',ch:'井',need:{stone:10,wood:4,rope:2,pot:2,labor:6},desc:'日照りでも水が絶えない。',effect:'干ばつと熱病の害が半分になる。',open:()=>S.day>=8},
+  storehouse:{name:'共同の倉',ch:'蔵',need:{wood:14,clay:10,rope:3,labor:8},desc:'村の蓄えを一か所で守る。',effect:'村じゅうの食べ物の傷みが2割減り、獣の群れの害も半分になる。',open:()=>S.day>=15||!!S.flags.fac_granary},
+  square:{name:'市の広場',ch:'市',need:{stone:14,wood:8,clay:6,labor:8},desc:'人と品物が集まる場所。',effect:'村人どうしの取引が増え、旅の商人もよく来る。あなたに声もかかりやすくなる。',open:()=>S.day>=20||Object.keys(S.flags).some(k=>k.startsWith('ind_'))},
+  bridge:{name:'橋',ch:'橋',need:{wood:18,stone:8,rope:5,labor:10},desc:'川向こうの奥地へ渡れる。',effect:'遠出で危険に遭いにくくなる。',open:()=>S.day>=25},
+  shrine:{name:'社',ch:'社',need:{stone:12,wood:6,clay:6,rare:3,labor:8},desc:'珍品を供えて祀る。',effect:'吉兆の仕事がさらに実り(1.5倍→1.8倍)、珍品も出やすくなる。お守りも長くもつ。',open:()=>(S.day>=10&&RARES.some(g=>S.found[g]))||S.day>=30},
 };
 /* 肩書き: 名声と完成させた大事業の数で上がる。下がることはない */
 const TITLES=[
@@ -140,7 +140,7 @@ function newAgent(region,isPlayer){
 }
 function freshWorld(){
   S={day:1,agents:[],prices:{},money:{},hist:[],log:[],flags:{},firstBy:{},event:null,offers:[],nextId:1,nextOffer:1,
-     today:{trades:0,ind:{}},lastInd:{},lastTrades:0,omen:rnd(Object.keys(OMENS)),card:null,found:{},designs:{},works:{},ayumi:{},stat:newStat(),
+     today:{trades:0,ind:{}},lastInd:{},lastTrades:0,omen:rnd(Object.keys(OMENS)),card:null,found:{},designs:{},works:{},ayumi:{},seen:{},stat:newStat(),
      ui:{tile:null,teach:null,msg:'',exp:null,hints:[],map:false,wb:{m:'stone',s:'point',h:'long',b:'fiber'}}};
   for(const g of ORDER){S.prices[g]=ITEMS[g].base;S.money[g]=.04}
   S.agents.push(newAgent(null,true));
@@ -822,7 +822,22 @@ const AYUMI=[
 function checkAyumi(quiet){const P=player();if(!P.region)return;
   for(const x of AYUMI){if(S.ayumi[x.id]||!x.t(P))continue;S.ayumi[x.id]=S.day;
     if(!quiet){logIt(`あゆみ帳「${x.name}」: ${x.desc}。`,'ayumi');toast(`<b>あゆみ</b> ${x.name}`,'good',3200)}}
-  checkTitle(quiet)}
+  checkTitle(quiet);checkReveal(quiet)}
+/* 情報の出し方: 序盤は暮らしの基本だけを見せ、条件を満たした欄から順に見せる。一度見せた欄は消さない(S.seen に日付を残す) */
+const REVEALS=[
+  {id:'villagers',name:'村人の一覧',t:()=>S.day>=4||S.stat.trade>=1},
+  {id:'prices',name:'物価',t:()=>S.day>=6||S.stat.trade>=1},
+  {id:'chart',t:()=>S.hist.length>=8},
+  {id:'rares',name:'珍品帳',t:()=>RARES.some(g=>S.found[g])},
+  {id:'ayumi',name:'あゆみ帳',t:()=>Object.keys(S.ayumi).length>=1},
+  {id:'fame',name:'名声と肩書き',t:P=>(P.fame||0)>0},
+  {id:'money',name:'お金の芽',t:()=>Object.keys(S.flags).some(k=>k.startsWith('ind_'))||S.day>=15},
+];
+const seen=k=>!!S.seen[k];
+function checkReveal(quiet){const P=player();
+  for(const x of REVEALS){if(seen(x.id)||!x.t(P))continue;S.seen[x.id]=S.day;if(!quiet&&x.name)toast(`<b>新しく見られる</b> ${x.name}`,'norm',3000)}
+  for(const[k,W]of Object.entries(WORKS)){if(seen('work_'+k)||!W.open())continue;S.seen['work_'+k]=S.day;
+    if(!quiet){logIt(`村で${W.name}を作ろうという話が出ている。${W.desc}「村の大事業」から呼びかけられる。`,'work');toast(`<b>村の話</b> ${W.name}を作ろう`,'good',3200)}}}
 const nextGoal=()=>AYUMI.find(x=>!S.ayumi[x.id]);
 
 /* ================= 演出 ================= */
@@ -848,13 +863,17 @@ const TCOL={soil:'t-soil',forest:'t-forest',rock:'t-rock',ore:'t-ore',clay:'t-cl
 function render(){
   const P=player();const pop=live().length;const playing=!!P.region&&P.health>0;
   $('status').innerHTML=`<span class="day">第<b class="num">${S.day}</b>日</span>${P.region?laborDots(P.labor):''}
-    <span class="chip">人口 <span class="num">${pop}</span></span><span class="chip">昨日の取引 <span class="num">${S.lastTrades||0}</span>件</span>
+    <span class="chip">人口 <span class="num">${pop}</span></span>${seen('money')?`<span class="chip">昨日の取引 <span class="num">${S.lastTrades||0}</span>件</span>`:''}
     ${S.event?`<span class="chip ev">${EVENTS[S.event.type].name}・あと${S.event.days}日</span>`:''}
     <span class="chip ev" title="この日はこの仕事が${omenMul()}倍、珍品も出やすい">吉兆: ${OMENS[S.omen]}</span>${P.charm>0?`<span class="chip ev">お守り・あと${P.charm}日</span>`:''}
     ${playing&&S.offers.length?`<span class="chip call">声かけ <span class="num">${S.offers.length}</span>件</span>`:''}`;
   $('barinfo').innerHTML=`<span class="day">第<b class="num">${S.day}</b>日</span>${P.region?laborDots(P.labor):''}`;
   $('end').disabled=!playing;$('auto').disabled=!playing;
-  $('land').hidden=$('work').hidden=$('works').hidden=$('bench').hidden=$('rares').hidden=$('ayumi').hidden=!P.region;
+  $('land').hidden=$('work').hidden=$('bench').hidden=!P.region;
+  $('rares').hidden=!P.region||!seen('rares');$('ayumi').hidden=!P.region||!seen('ayumi');
+  $('works').hidden=!P.region||!Object.keys(WORKS).some(k=>seen('work_'+k));
+  $('moneyP').hidden=!seen('money');$('pricesP').hidden=!seen('prices');$('villP').hidden=!seen('villagers');
+  $('chart').parentElement.hidden=$('legend').hidden=!seen('chart');
   renderCard(P);renderCalls(P);renderYou(P);if(P.region){renderLand(P);renderWork(P);renderWorks(P);renderBench(P);renderRares();renderAyumi()}
   renderMarket(P);renderMoney();renderPrices();renderLog();renderVillagers(P);
   if(P.region&&P.health<=0){$('over').hidden=false;$('over').innerHTML=`<div class="panel"><h2>あなたは倒れた</h2><p class="lead">${S.day}日を生きた。一人で全部をまかなうのは難しい。何を作り、何を換えるかが生死を分ける。</p><button class="btn primary" id="again">新しい村で始める</button></div>`}
@@ -878,10 +897,10 @@ function renderYou(P){
   const rank=`<div class="rank"><span class="tn">${T.name}</span><span class="num">名声 ${r1(P.fame||0)}</span>${N?`<span class="sb"><i style="width:${Math.min(100,(P.fame||0)/N.fame*100)}%"></i></span>
     <small>次は「${N.name}」: 名声${N.fame}${N.works?`・大事業を${N.works}つ完成(いま${worksDone()})`:''}。${N.perk}</small>`:'<span></span><small>村でいちばん頼られる人になった。</small>'}</div>`;
   $('you').innerHTML=`<h2>あなたの暮らし <small>${REG[P.region].name}・食べ物は約${Math.floor(ft/2)}日分</small></h2>
-    ${rank}${goal?`<p class="goal">次の目標 <b>${goal.name}</b> ${goal.desc}</p>`:''}
+    ${seen('fame')?rank:''}${goal?`<p class="goal">次の目標 <b>${goal.name}</b> ${goal.desc}</p>`:''}
     <div class="health"><span>体力</span>${hbar(P.health)}<span class="num">${Math.round(P.health)}</span></div>
     ${grp('食べ物',food.length?food:['<span class="it low">なし</span>'])}${grp('素材・品物',rest)}${grp('珍品',rares)}${grp('道具',tools.length?tools:['<span class="note">まだ道具はない。下の「道具づくり」で組み立てよう。</span>'])}
-    <p class="note">毎日 食べ物2・塩0.2・木材0.3 を使う。2種類以上食べると体力が少し戻る。土器と倉は食べ物の傷みを抑え、塩は魚を長持ちさせる。</p>`;
+    ${S.day<=7?'<p class="note">毎日 食べ物2・塩0.2・木材0.3 を使う。2種類以上食べると体力が少し戻る。</p>':''}`;
 }
 function renderLand(P){
   const sel=S.ui.tile;
@@ -918,7 +937,6 @@ function renderWork(P){
   }
   const rows=Object.entries(GATHER).filter(([g,d])=>freeTiles(P,d.tiles)||P.plot.some(p=>d.tiles.includes(p.t))).map(([g,d])=>{const i=gatherInfo(P,g);
     let sub=i.y>0?(i.tool&&isTool(i.tool)?`${ITEMS[i.tool].name}を使う・残り${curDur(P,i.tool)}回`:i.tool?`${ITEMS[i.tool].name}で煮詰める`:'素手'):i.why;
-    const rr=(RARE_DROP[g]||[]).filter(([it,p,tile])=>!tile||freeTiles(P,[tile]));if(i.y>0&&rr.length)sub+=`・<em>まれに${rr.map(x=>ITEMS[x[0]].name).join('・')}</em>`;
     if(S.omen===g&&i.y>0)sub='吉兆・'+sub;
     return `<button class="act ${S.omen===g?'omen':''}" data-gather="${g}" ${i.y<=0||P.labor<1?'disabled':''}>${gl(g)}<span class="an">${d.name}<span class="as">${sub}</span></span><span class="ay">${i.y>0?'約'+q(g,i.y):''}</span></button>`});
   const fi=fieldInfo(P);const fc=facCount(P,'field');
@@ -932,7 +950,9 @@ function renderBench(P){
   const wb=S.ui.wb;if(wb.h==='none')wb.b='none';else if(wb.b==='none'&&wb.lastB)wb.b=wb.lastB;
   const key=dkey(wb.s,wb.m,wb.h,wb.b),d=ITEMS[key]||designCalc(key),why=designWhy(P,key),known=P.known.includes(key);
   const dots=(v,mx)=>'●'.repeat(Math.round(v))+'○'.repeat(Math.max(0,mx-Math.round(v)));const M=HEAD[wb.m];
-  const heads=Object.entries(HEAD).map(([m,h])=>`<button data-wbm="${m}" aria-pressed="${wb.m===m}" class="${cnt(P,m)<1?'lack':''}">${gl(m)}<span>${h.name}<small>手元 ${q(m,cnt(P,m))}</small></span></button>`).join('');
+  /* 先端の素材は、手にしたことのある物だけ並べる(木と石は最初から) */
+  const met=m=>m==='wood'||m==='stone'||m===wb.m||cnt(P,m)>0||!!S.found[m]||(m==='blade'&&knows(P,'blade'))||(m==='copper'&&knows(P,'smelt'))||P.known.some(k=>isDesign(k)&&ITEMS[k].design.m===m);
+  const heads=Object.entries(HEAD).filter(([m])=>met(m)).map(([m,h])=>`<button data-wbm="${m}" aria-pressed="${wb.m===m}" class="${cnt(P,m)<1?'lack':''}">${gl(m)}<span>${h.name}<small>手元 ${q(m,cnt(P,m))}</small></span></button>`).join('');
   const shapes=Object.entries(SHAPES).map(([k,x])=>`<button data-wbs="${k}" aria-pressed="${wb.s===k}"><span class="gl c-tool">${x.ch}</span><span>${x.name}<small>${x.does}</small></span></button>`).join('');
   const hands=Object.entries(HANDLES).map(([k,x])=>`<button data-wbh="${k}" aria-pressed="${wb.h===k}"><span>${x.name}${x.wood?`(木${x.wood})`:''}<small>${x.note}</small></span></button>`).join('');
   const binds=Object.entries(BINDS).map(([k,x])=>`<button data-wbb="${k}" aria-pressed="${wb.b===k}" ${wb.h==='none'?'disabled':''}><span>${x.name}${Object.keys(x.mat).length?`(${Object.entries(x.mat).map(([g,n])=>ITEMS[g].name+n).join('')})`:''}<small>${x.note}</small></span></button>`).join('');
@@ -997,16 +1017,17 @@ function renderWorks(P){const k=activeWork();let cur='';
       <p class="note">${by.length?`力を貸した人: ${by.slice(0,8).map(([n,v])=>`${n} ${Math.round(v)}`).join('・')}`:'まだ誰も手を貸していない。'}</p></div>`}
   const list=Object.entries(WORKS).filter(([x])=>x!==k).map(([x,W])=>{
     if(built(x))return `<div class="rec done"><div><div class="rf"><span class="gl c-salt">${W.ch}</span><b>${W.name}</b><span class="tag">${S.works[x].done}日目に完成</span></div><div class="rd">${W.effect}</div></div></div>`;
-    if(!W.open())return `<div class="rec locked"><div><div class="rf"><span class="gl c-none">?</span><b>${W.name}</b></div><div class="rd">${W.hint}</div></div></div>`;
+    if(!seen('work_'+x))return'';
     return `<div class="rec"><div><div class="rf"><span class="gl c-salt">${W.ch}</span><b>${W.name}</b></div><div class="rd">${W.desc}${W.effect}</div>
       <div class="bc">${Object.entries(W.need).map(([g,n])=>`${workGl(g)}<span class="num">${n}</span>`).join(' ')}</div></div>
       <div class="rb"><button class="btn small" data-wstart="${x}" ${k?'disabled':''}>呼びかける</button></div></div>`}).join('');
   $('works').innerHTML=`<h2>村の大事業 <small>完成 ${worksDone()}/${Object.keys(WORKS).length}・一度に進められるのは1つ</small></h2>
     <p class="note">材料と人手を村じゅうで持ち寄って建てる。完成すると村の誰もが恩恵を受ける。出した物の値打ちはあなたの名声になり、肩書きが上がるほど村人が手を貸してくれる。手持ちの財で村人に頼むこともできる。</p>
     ${cur}<div class="book">${list}</div>`}
-function renderAyumi(){const n=AYUMI.filter(x=>S.ayumi[x.id]).length;
+/* 達成した項目と、まだの項目のうち次の3つだけを見せる */
+function renderAyumi(){const n=AYUMI.filter(x=>S.ayumi[x.id]).length;const next=AYUMI.filter(x=>!S.ayumi[x.id]).slice(0,3);
   $('ayumi').innerHTML=`<h2>あゆみ帳 <small>${n}/${AYUMI.length}</small></h2>
-    <div class="coll">${AYUMI.map(x=>S.ayumi[x.id]?`<div class="cl on"><span class="gl c-salt">節</span><span>${x.name}<small>${S.ayumi[x.id]}日目・${x.desc}</small></span></div>`
+    <div class="coll">${AYUMI.filter(x=>S.ayumi[x.id]||next.includes(x)).map(x=>S.ayumi[x.id]?`<div class="cl on"><span class="gl c-salt">節</span><span>${x.name}<small>${S.ayumi[x.id]}日目・${x.desc}</small></span></div>`
       :`<div class="cl"><span class="gl c-none">・</span><span>${x.name}<small>${x.desc}</small></span></div>`).join('')}</div>`}
 function renderMarket(P){
   if(!P.region)$('offers').innerHTML=`<div class="empty">住む場所を決めると、困った村人が声をかけてくることがある。</div>`;
@@ -1114,6 +1135,6 @@ try{window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',
 
 function start(data){S=(data&&data.state)||load();if(!S){freshWorld()}for(const k in(S.designs||{}))defineDesign(k);S.ui.wb=S.ui.wb||{m:'stone',s:'point',h:'long',b:'fiber'};
   /* 大事業・肩書き・あゆみより前の保存を引き継ぐ。すでに満たしている項目は黙って記録する */
-  S.works=S.works||{};S.ayumi=S.ayumi||{};S.stat={...newStat(),...(S.stat||{})};{const P=player();P.fame=P.fame||0;P.title=P.title||0}
+  S.works=S.works||{};S.ayumi=S.ayumi||{};S.seen=S.seen||{};S.stat={...newStat(),...(S.stat||{})};{const P=player();P.fame=P.fame||0;P.title=P.title||0}
   checkAyumi(true);render()}
 if(typeof window!=='undefined'&&!window.__HAJIMARI_HEADLESS__)start({});

@@ -88,7 +88,6 @@ button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid 
 @keyframes pop{from{transform:translateY(18px) scale(.8);opacity:0}to{transform:none;opacity:1}}
 @keyframes shine{50%{filter:brightness(1.3)}}
 .act.omen{border-color:var(--accent);background:var(--accent-soft)}
-.act .as em{font-style:normal;color:var(--rare)}
 .risk{display:flex;align-items:center;gap:10px;font-size:13px}
 .riskbar{flex:1;height:8px;background:var(--sunk);border-radius:99px;overflow:hidden}.riskbar i{display:block;height:100%;background:var(--bad)}
 .steps{display:flex;gap:4px;flex-wrap:wrap}.steps i{width:22px;height:6px;border-radius:3px;background:var(--sunk)}.steps i.on{background:var(--ink)}.steps i.x{background:var(--bad)}

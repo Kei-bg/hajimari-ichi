@@ -53,7 +53,7 @@ docs/DESIGN.md      ゲームデザインと数値の一覧
 | プレイヤーの操作 | `chooseRegion`、`acceptOffer`、`propose`、`teachOffer`/`doTeach`、`unlockHold`(素材を持つと加工を思いつく)、`act`(操作の共通ラッパー) |
 | 遠出 | `startExp`/`stepExp`/`finishExp`、`expOutcome`、`expRisk` |
 | 今日の出来事 | `maybeCard`、`makeCard`、`resolveCard` |
-| 大事業・肩書き・あゆみ | `built`(完成済みか。効果の分岐はこれで見る)、`startWork`/`giveWork`/`finishWork`、`workGive`(出す)/`workHire`・`hirePay`(財で頼む)、`worksDay`(村人の手伝い)、`autoWorks`(おまかせ用)、`addFame`/`checkTitle`、`AYUMI`/`checkAyumi`(`save` のたびに判定) |
+| 大事業・肩書き・あゆみ | `built`(完成済みか。効果の分岐はこれで見る)、`startWork`/`giveWork`/`finishWork`、`workGive`(出す)/`workHire`・`hirePay`(財で頼む)、`worksDay`(村人の手伝い)、`autoWorks`(おまかせ用)、`addFame`/`checkTitle`、`AYUMI`/`checkAyumi`(`save` のたびに判定)、`REVEALS`/`checkReveal`(欄を見せ始める条件) |
 | 演出 | `toast` 系 |
 | 描画 | `render` と各パネルの `renderXxx`。毎回 innerHTML で全描画 |
 | 進行・保存 | おまかせ、localStorage(キー `hajimari-ichi-v4`)、クリック処理(イベント委譲、`data-*` 属性で分岐)、`start` |
@@ -64,7 +64,7 @@ docs/DESIGN.md      ゲームデザインと数値の一覧
 - エージェント: `inv`(品物→量)、`durs`(道具→耐久の配列。`inv[t]` と長さが常に一致)、`known`(加工レシピIDと道具の型キー)、`plot`(24マス `{t:地形, f:施設|null}`)、`health`、`labor`(1日4)、`want`、`charm`
 - `S.prices`(穀物=1が基準)、`S.money`(品物ごとの「お金としての通用度」0〜1)
 - `S.designs`(村で誰かが作った道具の型 → `{by, day}`)。**型は実行時に `ITEMS` へ登録される**ので、読み込み時に `defineDesign` し直している(`start` 参照)
-- `S.works`(大事業 → `{got:{品物|labor|rare:量}, by:{名前:出した値打ち}, start, done}`。`done` が0なら普請中)、`S.ayumi`(項目ID → 達成した日)、`S.stat`(あゆみ判定用のプレイヤーの回数)。プレイヤーだけ `fame`(名声)と `title`(肩書きの段)を持つ。これらが無い古い保存は `start` で補う
+- `S.works`(大事業 → `{got:{品物|labor|rare:量}, by:{名前:出した値打ち}, start, done}`。`done` が0なら普請中)、`S.ayumi`(項目ID → 達成した日)、`S.stat`(あゆみ判定用のプレイヤーの回数)、`S.seen`(見せ始めた欄 → 日付。大事業は `work_キー`)。プレイヤーだけ `fame`(名声)と `title`(肩書きの段)を持つ。これらが無い古い保存は `start` で補う
 - `S.card`(今日の出来事)、`S.found`(珍品帳)、`S.ui`(画面の一時状態: 選択マス、組み立て台 `wb`、遠出 `exp` など)
 
 ## 守ってほしい決まり
