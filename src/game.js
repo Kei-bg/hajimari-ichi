@@ -726,7 +726,7 @@ const titleLv=()=>player().title||0;
 function addFame(n){const P=player();P.fame=r1((P.fame||0)+n)}
 const workLeft=(k,g)=>Math.max(0,r2(WORKS[k].need[g]-(S.works[k].got[g]||0)));
 const workName=g=>g==='labor'?'人手':g==='rare'?'珍品':ITEMS[g].name;
-const workGl=g=>g==='labor'?'<span class="gl c-tool">人</span>':g==='rare'?'<span class="gl c-rare">珍</span>':gl(g);
+const workGl=g=>g==='labor'?'<span class="gl c-tool" title="人手">人</span>':g==='rare'?'<span class="gl c-rare" title="珍品">珍</span>':gl(g);
 const workQ=(g,n)=>g==='rare'?String(Math.round(n)):q(g==='labor'?'grain':g,n);
 const LABOR_VAL=2;/* 人手1の値打ち(名声の計算と、人を雇うときの手間賃の目安) */
 function startWork(k){if(activeWork()||built(k)||!WORKS[k].open())return;

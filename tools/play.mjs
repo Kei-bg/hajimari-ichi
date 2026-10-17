@@ -63,22 +63,27 @@ const decode = s => s.replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt
 const attr = (a, k) => { const m = a.match(new RegExp(`\\s${k}="([^"]*)"`)); return m ? m[1] : null; };
 function toText(html, letter, buttons) {
   let tile = 0;
-  if (letter === null) html = html.replace(/<span class="gl[^"]*"[^>]*>[^<]*<\/span>/g, ''); // ボタンの中の飾り文字は落とす
+  html = html.replace(/\s*\n\s*/g, ' '); // ソースの改行は区切りにしない
+  if (letter === null) html = html.replace(/<span class="gl(?: [^"]*)?"[^>]*>[^<]*<\/span>/g, ''); // ボタンの中の飾り文字は落とす
   html = html.replace(/<button([^>]*)>([\s\S]*?)<\/button>/g, (_, a, inner) => {
     const data = {}; for (const m of a.matchAll(/\sdata-([a-z]+)="([^"]*)"/g)) data[m[1]] = m[2];
     const id = attr(a, 'id'), dis = /\sdisabled(\s|$)/.test(a + ' '), pressed = attr(a, 'aria-pressed') === 'true';
     let label = attr(a, 'aria-label') || toText(inner, null, null).replace(/\s+/g, ' ').trim();
     if (/\bsel\b/.test(attr(a, 'class') || '')) label += '(選択中)';
     if (pressed) label += '✓';
-    const no = letter + (buttons.filter(b => b.no.startsWith(letter)).length + 1);
-    buttons.push({ no, id, data, dis, label });
+    /* 番号はボタンの働き(id と data-*)ごとに一度だけ振り、保存して使い回す。ほかのボタンが消えても番号がずれない */
+    const sig = letter + '|' + (id || '') + '|' + JSON.stringify(data) + (id || Object.keys(data).length ? '' : '|' + label);
+    meta.ids = meta.ids || {}; meta.next = meta.next || {};
+    const no = meta.ids[sig] || (meta.ids[sig] = letter + (meta.next[letter] = (meta.next[letter] || 0) + 1));
+    buttons.push({ no, sig, id, data, dis, label });
     const tail = data.tile != null && (++tile) % 6 === 0 ? '\n' : ' ';
     return `${dis ? '[--]' : '[' + no + ']'}${label}${tail}`;
   });
-  html = html.replace(/<span class="gl[^"]*" title="([^"]*)">[^<]*<\/span>/g, (m, t, off, s) => {
+  html = html.replace(/<span class="gl(?: [^"]*)?" title="([^"]*)">[^<]*<\/span>/g, (m, t, off, s) => {
     const next = s.slice(off + m.length).replace(/<[^>]+>/g, '').trimStart();
     return next.startsWith(t) ? '' : t + ' ';
-  }).replace(/<span class="gl[^"]*">[^<]*<\/span>/g, '');
+  }).replace(/<span class="gl(?: [^"]*)?">[^<]*<\/span>/g, '');
+  html = html.replace(/<td><span class="bar[^"]*"><i style="width:(\d+)%"><\/i><\/span>/g, '<td>$1'); // 村人の体力のバーは数字で
   html = html.replace(/<(b|small|em|strong|span)[^>]*>|<\/(span|b|small|em|strong)>/g, ' ');
   html = html.replace(/<i class="on"><\/i>/g, '●').replace(/<i class=""><\/i>/g, '○').replace(/<i class="x"><\/i>/g, '×');
   html = html.replace(/<h2[^>]*>/g, '\n■ ').replace(/<h3[^>]*>/g, '\n◆ ').replace(/<h4[^>]*>/g, '\n◇ ')
@@ -126,7 +131,7 @@ if (cmd === 'press') {
   for (let i = 0; i < times; i++) {
     const sc = i ? screen() : before;
     let target = no;
-    if (i) { const same = sc.buttons.find(x => x.no === no && x.label === label) || sc.buttons.find(x => x.label === label); if (!same) { msg.push(`${i}回押したところで「${label}」が見当たらなくなった。`); break; } target = same.no; }
+    if (i && !sc.buttons.some(x => x.no === no)) { msg.push(`${i}回押したところで「${label}」が見当たらなくなった。`); break; }
     const e = press(target, sc); if (e) { msg.push(i ? `${i}回押したところで止まった: ${e}` : e); break; }
   }
 } else if (cmd === 'trade') {
