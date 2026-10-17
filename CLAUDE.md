@@ -10,7 +10,8 @@
 - ブラウザで遊ぶ: `index.html` を直接開くか、`npm start`(`npx serve` で http://localhost:5173)
 - バランスを数値で確かめる: `npm run sim`(= `node tools/simulate.mjs 4 120`)
   - 引数: `node tools/simulate.mjs [村の数] [日数] [--seed-region=plain|river|coast|forest]`
-  - プレイヤーも「おまかせ」で動かし、村ごとに人口・体力・畑・道具・お金の主役・物価を出す
+  - この PC には node が無い。VS Code 同梱の Electron を node として使える: `ELECTRON_RUN_AS_NODE=1 "/c/Users/user/AppData/Local/Programs/Microsoft VS Code/Code.exe" tools/simulate.mjs 4 120`
+  - プレイヤーも「おまかせ」で動かし、村ごとに人口・体力・畑・道具・お金の主役・物価・声かけの日数・肩書き・あゆみ・大事業の進み方を出す
   - **経済まわりを変えたら、必ず sim を回して前後を比べる**(1村120日でおよそ2秒)
 - ビルド工程・依存パッケージはない。素の HTML / CSS / JavaScript。
 
@@ -41,17 +42,18 @@ docs/DESIGN.md      ゲームデザインと数値の一覧
 
 | 区画 | 主な中身 |
 |---|---|
-| 定義 | `ITEMS`(品物)、`TER`/`REG`(地形・土地)、`GATHER`(採集)、`RECIPES`(加工)、`FAC`(施設)、`EVENTS`/`OMENS`/`RARE_DROP`/`HAZ` |
+| 定義 | `ITEMS`(品物)、`TER`/`REG`(地形・土地)、`GATHER`(採集)、`RECIPES`(加工)、`FAC`(施設)、`WORKS`(村の大事業)、`TITLES`(肩書き)、`EVENTS`/`OMENS`/`RARE_DROP`/`HAZ` |
 | 世界 | `makePlot`(6×4の土地生成)、`newAgent`、`freshWorld` |
 | 所持品・土地 | `cnt`/`add`/`take`、`useTool`(道具1個ごとの耐久 `a.durs[t]` 配列)、`hasFac`、`watered` |
 | 道具の組み立て | `HEAD`/`SHAPES`/`HANDLES`/`BINDS`、`designCalc`(性能の式)、`registerDesign`/`learnDesign`、`bestPower`、`craftDesign` |
 | 仕事 | `gatherInfo`/`doGather`(運の振れ・珍品)、`doField`、`doCraft`(加工)、`doBuild` |
 | 村人の考え方 | `toolUseJobs`/`toolUse`(道具の価値)、`facValue`、`computeWant`(欲しい物)、`agentVal`(主観価値)、`chooseAction`(効用最大の行動)、`aiInvent`/`aiLearn` |
 | 交換 | `deficit`/`surplus`、`exchange`、`tryTrade`(物々交換→仲立ち品の順) |
-| 1日の終わり | `endDay`(1日の進行の全手順)、`consume`/`decay`、`updatePrices`、`updateMoney`、`people`、`events`、`genOffers` |
+| 1日の終わり | `endDay`(1日の進行の全手順)、`consume`/`decay`、`updatePrices`、`updateMoney`、`people`、`events`、`needWhy`/`genOffers`(困っている村人だけが声をかける) |
 | プレイヤーの操作 | `chooseRegion`、`acceptOffer`、`propose`、`teachOffer`/`doTeach`、`unlockHold`(素材を持つと加工を思いつく)、`act`(操作の共通ラッパー) |
 | 遠出 | `startExp`/`stepExp`/`finishExp`、`expOutcome`、`expRisk` |
 | 今日の出来事 | `maybeCard`、`makeCard`、`resolveCard` |
+| 大事業・肩書き・あゆみ | `built`(完成済みか。効果の分岐はこれで見る)、`startWork`/`giveWork`/`finishWork`、`workGive`(出す)/`workHire`・`hirePay`(財で頼む)、`worksDay`(村人の手伝い)、`autoWorks`(おまかせ用)、`addFame`/`checkTitle`、`AYUMI`/`checkAyumi`(`save` のたびに判定) |
 | 演出 | `toast` 系 |
 | 描画 | `render` と各パネルの `renderXxx`。毎回 innerHTML で全描画 |
 | 進行・保存 | おまかせ、localStorage(キー `hajimari-ichi-v4`)、クリック処理(イベント委譲、`data-*` 属性で分岐)、`start` |
@@ -62,6 +64,7 @@ docs/DESIGN.md      ゲームデザインと数値の一覧
 - エージェント: `inv`(品物→量)、`durs`(道具→耐久の配列。`inv[t]` と長さが常に一致)、`known`(加工レシピIDと道具の型キー)、`plot`(24マス `{t:地形, f:施設|null}`)、`health`、`labor`(1日4)、`want`、`charm`
 - `S.prices`(穀物=1が基準)、`S.money`(品物ごとの「お金としての通用度」0〜1)
 - `S.designs`(村で誰かが作った道具の型 → `{by, day}`)。**型は実行時に `ITEMS` へ登録される**ので、読み込み時に `defineDesign` し直している(`start` 参照)
+- `S.works`(大事業 → `{got:{品物|labor|rare:量}, by:{名前:出した値打ち}, start, done}`。`done` が0なら普請中)、`S.ayumi`(項目ID → 達成した日)、`S.stat`(あゆみ判定用のプレイヤーの回数)。プレイヤーだけ `fame`(名声)と `title`(肩書きの段)を持つ。これらが無い古い保存は `start` で補う
 - `S.card`(今日の出来事)、`S.found`(珍品帳)、`S.ui`(画面の一時状態: 選択マス、組み立て台 `wb`、遠出 `exp` など)
 
 ## 守ってほしい決まり
@@ -85,7 +88,7 @@ docs/DESIGN.md      ゲームデザインと数値の一覧
 
 1. 季節(冬は採集できず、蓄えが要る)
 2. 労働力を増やす手段(家族・弟子)
-3. 村で共有する施設(共同の倉・水路)と、その負担の分け方
+3. ~~村で共有する施設~~ → 「村の大事業」として実装済み。負担の分け方(村人が出し渋る・ただ乗りする)は未着手
 4. オンライン化(下記)
 
 ## オンライン版の方針(合意済みの骨子)

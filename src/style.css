@@ -98,6 +98,25 @@ button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid 
 .coll{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px}
 .cl{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;background:var(--sunk);font-size:13px;color:var(--muted);min-width:0}
 .cl.on{color:var(--ink)}.cl small{display:block;font-size:11px;color:var(--muted)}
+/* 声かけ・肩書き・大事業 */
+#calls{border:1.5px solid var(--ink)}
+#calls .cardk{color:var(--ink)}
+.chip.call{background:var(--ink);color:var(--bg)}
+.rank{display:grid;grid-template-columns:auto auto minmax(60px,1fr);gap:4px 10px;align-items:center;font-size:13px}
+.rank .tn{font-family:var(--f-display);font-weight:800;font-size:17px;letter-spacing:.04em}
+.rank .sb i{background:var(--accent)}
+.rank small{grid-column:1/-1;color:var(--muted);font-size:12px}
+.goal{margin:0;font-size:13px;padding:7px 10px;border-radius:7px;background:var(--accent-soft);text-wrap:pretty}
+.goal b{margin:0 6px}
+.works{display:flex;flex-direction:column;gap:8px}
+.wrow{display:grid;grid-template-columns:22px 3.6em minmax(50px,1fr) 4.6em auto;gap:8px;align-items:center;font-size:13px}
+.wrow .sb i{background:var(--accent)}
+.wrow .num{text-align:right}
+.wrow .wb{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+@media (max-width:600px){.wrow{grid-template-columns:22px 3.6em minmax(50px,1fr) 4.6em}.wrow .wb{grid-column:1/-1}}
+.rec.done{background:var(--accent-soft);border-color:transparent}
+.rec.locked{border-style:dashed;color:var(--muted)}
+.rec .bc{display:flex;flex-wrap:wrap;gap:4px 8px;font-size:12px;align-items:center;margin-top:4px}
 
 .health{display:flex;align-items:center;gap:10px;font-size:13px}
 .bar{flex:1;height:8px;background:var(--sunk);border-radius:99px;overflow:hidden}
@@ -216,6 +235,8 @@ button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid 
 .log li.tech span{font-weight:700}
 .log li.you span{color:var(--ink);font-weight:500}
 .log li.rare span{color:var(--rare);font-weight:700}
+.log li.work span{color:var(--good);font-weight:700}
+.log li.ayumi span{color:var(--good)}
 
 .vtable{overflow-x:auto}
 table{border-collapse:collapse;width:100%;font-size:13px;min-width:520px}
