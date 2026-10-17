@@ -33,7 +33,7 @@ sh tools/play.sh <保存ファイル> auto 5          おまかせで5日進め�
 
 ## 感想の書き方
 
-遊び終えたら、呼び出し元が指定した場所に Markdown で書く。指定がなければ、PC なら vault の `G:My Driveaude_obsidianはじまりの市 テストプレイ<日付> <人物像>.md`、vault が見えない環境(クラウド)なら `docs/playtest/<日付> <人物像>.md`。書式は次のとおり。見出しは変えない。
+遊び終えたら、呼び出し元が指定した場所に Markdown で書く。指定がなければ、PC なら vault の `G:/My Drive/claude_obsidian/はじまりの市 テストプレイ/<日付> <人物像>.md`、vault が見えない環境(クラウド)なら `docs/playtest/<日付> <人物像>.md`。書式は次のとおり。見出しは変えない。
 
 ```markdown
 ---
