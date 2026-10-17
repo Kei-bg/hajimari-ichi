@@ -34,6 +34,8 @@ const GOODS=ORDER.filter(g=>!ITEMS[g].dur);
 function refreshKeys(){ORDER=Object.keys(ITEMS);TOOLS=ORDER.filter(g=>ITEMS[g].dur)}
 const FOOD=['meat','fish','berries','grain'];
 const isTool=g=>!!(ITEMS[g]&&ITEMS[g].dur);
+/* 分けられない品(珍品と首飾り)。金の粒だけは粒なので分けられる。あなたが払う・受け取るときは1つ単位にする */
+const whole=g=>!!ITEMS[g]&&ITEMS[g].cat==='rare'&&g!=='gold';
 
 const TER={soil:'草地',forest:'林',rock:'岩場',ore:'鉱脈',clay:'粘土層',river:'川',shore:'浜'};
 const REG={
@@ -156,6 +158,8 @@ function first(key,t,kind){if(!S.flags[key]){S.flags[key]=1;logIt(t,kind)}}
 
 /* ================= 所持品・土地 ================= */
 const cnt=(a,g)=>a.inv[g]||0;
+/* 足りているか。手元は0.1刻みで見せているので、表示で足りて見える量(0.05未満の不足)は足りているとみなす */
+const enough=(a,g,n)=>cnt(a,g)>=n-.05;
 function add(a,g,n,durs){if(isDesign(g)&&!a.known.includes(g))a.known.push(g);if(isTool(g)){n=Math.round(n);a.inv[g]=cnt(a,g)+n;a.durs[g]=(a.durs[g]||[]).concat(durs&&durs.length===n?durs:Array(n).fill(ITEMS[g].dur))}else a.inv[g]=r2(cnt(a,g)+n)}
 function take(a,g,n){if(isTool(g)){n=Math.min(cnt(a,g),Math.round(n));a.inv[g]=cnt(a,g)-n;const ds=a.durs[g]||[];const out=ds.splice(Math.max(0,ds.length-n),n);if(!a.inv[g])delete a.durs[g];return out}
   a.inv[g]=Math.max(0,r2(cnt(a,g)-n));return null}
@@ -215,7 +219,7 @@ function bestPower(a,job,xj){let v=0,t=null;
   for(const g in a.inv){if(a.inv[g]<1)continue;const j=ITEMS[g]&&ITEMS[g].jobs;if(j&&j[job]>v){v=j[job];t=g}}
   if(xj&&xj[job]>v){v=xj[job];t=null}return{v,t}}
 function designWhy(a,key){const d=ITEMS[key]||designCalc(key);
-  const miss=Object.entries(d.mat).filter(([g,n])=>cnt(a,g)<n).map(([g,n])=>`${ITEMS[g].name}${q(g,n-cnt(a,g))}`);
+  const miss=Object.entries(d.mat).filter(([g,n])=>!enough(a,g,n)).map(([g,n])=>`${ITEMS[g].name}${q(g,n-cnt(a,g))}`);
   if(miss.length)return'足りない: '+miss.join('・');if(a.labor<1)return'労力が残っていない';return''}
 function craftDesign(a,key){if(designWhy(a,key))return false;const nw=learnDesign(a,key);const d=ITEMS[key];
   for(const[g,n]of Object.entries(d.mat))take(a,g,n);
@@ -253,9 +257,9 @@ function doGather(a,g){const i=gatherInfo(a,g);if(i.y<=0||a.labor<1)return false
   if(g==='fish')first('fish',`${a.isPlayer?'あなた':a.name}が初めて魚を獲った。`,'tech');return{g,amt,tier:L.tier,rare}}
 
 function fieldInfo(a){
-  let ripe=0,empty=0,yieldSum=0;const ev=S.event&&EVENTS[S.event.type].field||1;const sk=1+Math.max(0,bestPower(a,'reap').v-1)*.6;
-  a.plot.forEach((p,i)=>{if(p.f&&p.f.type==='field'){if(p.f.planted&&p.f.grow>=5){ripe++;yieldSum+=5*(watered(a,i)?1.5:1)*ev*sk}else if(!p.f.planted)empty++}});
-  return{ripe,empty,yieldSum:r1(yieldSum),seeds:Math.floor(cnt(a,'grain')+yieldSum),plantable:Math.min(empty+ripe,Math.floor(cnt(a,'grain')+yieldSum))};
+  let ripe=0,empty=0,growing=0,yieldSum=0;const ev=S.event&&EVENTS[S.event.type].field||1;const sk=1+Math.max(0,bestPower(a,'reap').v-1)*.6;
+  a.plot.forEach((p,i)=>{if(p.f&&p.f.type==='field'){if(p.f.planted&&p.f.grow>=5){ripe++;yieldSum+=5*(watered(a,i)?1.5:1)*ev*sk}else if(!p.f.planted)empty++;else growing++}});
+  return{ripe,empty,growing,yieldSum:r1(yieldSum),seeds:Math.floor(cnt(a,'grain')+yieldSum),plantable:Math.min(empty+ripe,Math.floor(cnt(a,'grain')+yieldSum))};
 }
 function doField(a){
   const fi=fieldInfo(a);if((!fi.ripe&&!(fi.empty&&cnt(a,'grain')>=1))||a.labor<1)return false;
@@ -272,7 +276,7 @@ function recipeIn(a,r){const m={...r.in};if(r.id==='charcoal'&&a.plot&&kilnAdj(a
 const recipeOut=(a,r)=>r.id==='pot'&&a.plot&&kilnAdj(a,'clay')?2:1;
 function craftWhy(a,r){
   if(r.needs&&!hasFac(a,r.needs))return'窯が要る';
-  const miss=Object.entries(recipeIn(a,r)).filter(([g,n])=>cnt(a,g)<n).map(([g,n])=>`${ITEMS[g].name}${q(g,n-cnt(a,g))}`);
+  const miss=Object.entries(recipeIn(a,r)).filter(([g,n])=>!enough(a,g,n)).map(([g,n])=>`${ITEMS[g].name}${q(g,n-cnt(a,g))}`);
   if(miss.length)return'足りない: '+miss.join('・');
   if(a.labor<1)return'労力が残っていない';return'';
 }
@@ -290,7 +294,7 @@ function canPlace(a,f,i){const p=a.plot[i];return !p.f&&FAC[f].on.includes(p.t)&
 function buildWhy(a,f,i){
   const d=FAC[f];if(!canPlace(a,f,i))return f==='ditch'&&!a.plot[i].f&&a.plot[i].t==='soil'?'川か水路の隣でないと掘れない':`${d.on.map(t=>TER[t]).join('・')}にしか作れない`;
   if(d.needJob&&!bestPower(a,d.needJob).v)return'土を掘る道具(先端を平たくした物)が要る';
-  const miss=Object.entries(d.mat).filter(([g,n])=>cnt(a,g)<n).map(([g,n])=>`${ITEMS[g].name}${q(g,n-cnt(a,g))}`);
+  const miss=Object.entries(d.mat).filter(([g,n])=>!enough(a,g,n)).map(([g,n])=>`${ITEMS[g].name}${q(g,n-cnt(a,g))}`);
   if(miss.length)return'足りない: '+miss.join('・');
   if(a.labor<buildCost(a,f))return`労力が${buildCost(a,f)}要る(残り${a.labor})`;return'';
 }
@@ -443,7 +447,7 @@ function tryTrade(a,b){
 function canProduce(a,g){if(!a.plot)return false;if(GATHER[g]&&gatherInfo(a,g).y>0)return true;const r=recipeFor(g);return !!r&&knows(a,r.id)&&(!r.needs||hasFac(a,r.needs))}
 function endDay(){
   const P=player();if(!P.region||P.health<=0)return;
-  S.today={trades:0,ind:{}};S.ui.teach=null;
+  S.today={trades:0,ind:{}};S.ui.teach=null;S.ui.msg='';
   if(S.ui.exp&&!S.ui.exp.done)finishExp(P,false);S.ui.exp=null;
   if(S.card){if(!S.card.result)logIt(`【${S.card.title}】何もしないまま一日が過ぎた。`,'you');S.card=null}
   if(autoTimer){if(Math.random()<.06)aiInvent(P);autoWorks(P);runAgent(P)}
@@ -543,12 +547,17 @@ function genOffers(){
     const wants=ORDER.filter(w=>deficit(a,w)>0&&cnt(P,w)>=(isTool(w)?1:.5)&&needWhy(a,w));if(!wants.length)continue;
     const w=rnd(wants),why=needWhy(a,w);
     if(Math.random()>(URGENT.includes(why)?.5:.05)*boost)continue;
-    let give=isTool(w)?1:r1(Math.min(deficit(a,w)+.3,cnt(P,w)*.6));if(give<.2)continue;
+    /* 道具と分けられない品(珍品・首飾り)は1つ単位でやりとりする */
+    const one=g=>isTool(g)||whole(g);
+    let give=isTool(w)?1:whole(w)?Math.min(Math.floor(cnt(P,w)),Math.max(1,Math.round(deficit(a,w)))):r1(Math.min(deficit(a,w)+.3,cnt(P,w)*.6));if(give<(one(w)?1:.2))continue;
     let pays=GOODS.filter(s=>s!==w&&surplus(a,s)>.2),medium=null,s;
     if(pays.length)s=rnd(pays);else{s=GOODS.filter(m=>m!==w&&spare(a,m)>.2).sort((x,y)=>S.money[y]-S.money[x])[0];if(!s)continue;medium=S.money[s]>.25?s:null}
     let get=give*S.prices[w]/S.prices[s]*(1.1+.05*Math.max(0,titleLv()-2));const lim=pays.includes(s)?surplus(a,s):spare(a,s);
-    if(get>lim){if(isTool(w))continue;give=r1(give*lim/get);get=lim}
-    get=r1(get);if(get<.1||give<.1)continue;
+    if(get>lim){if(one(w))continue;give=r1(give*lim/get);get=lim}
+    /* 相手の手持ちを超えないよう切り捨てる。1つ単位の品を切り捨てたら、こちらが渡す量も合わせて減らす */
+    const raw=get;get=whole(s)?Math.floor(get):Math.floor(get*10)/10;
+    if(get<raw-1e-9&&whole(s)){if(one(w)){if(get<raw*.8)continue}else give=r1(give*get/raw)}
+    if(get<(whole(s)?1:.1)||give<.1||cnt(a,s)<get)continue;
     S.offers.push({id:S.nextOffer++,aid:a.id,give:{g:w,amt:give},get:{g:s,amt:get},medium,why});
   }
 }
@@ -567,8 +576,8 @@ function chooseRegion(r){const P=player();P.region=r;P.plot=makePlot(r);unlockHo
   for(const a of ais())computeWant(a);genOffers();save();render()}
 function acceptOffer(id){
   const o=S.offers.find(x=>x.id===id),P=player(),a=S.agents.find(x=>x.id===o?.aid);if(!o||!a)return;
-  if(cnt(P,o.give.g)<o.give.amt){S.ui.msg=`${ITEMS[o.give.g].name}が足りない。`;return render()}
-  if(cnt(a,o.get.g)<o.get.amt){S.ui.msg=`${a.name}の手元にもう${ITEMS[o.get.g].name}がない。`;S.offers=S.offers.filter(x=>x!==o);return render()}
+  if(!enough(P,o.give.g,o.give.amt)){S.ui.msg=`${ITEMS[o.give.g].name}が足りない。`;return render()}
+  if(!enough(a,o.get.g,o.get.amt)){S.ui.msg=`${a.name}の手元にもう${ITEMS[o.get.g].name}がない。`;S.offers=S.offers.filter(x=>x!==o);return render()}
   exchange(a,P,o.get.g,o.get.amt,o.give.g,o.give.amt,o.medium);
   S.stat.trade++;S.stat.offer++;addFame(URGENT.includes(o.why)?2:1);
   logIt(`あなたは${a.name}に${ITEMS[o.give.g].name}${q(o.give.g,o.give.amt)}を渡し、${ITEMS[o.get.g].name}${q(o.get.g,o.get.amt)}を受け取った。`,'you');
@@ -576,16 +585,22 @@ function acceptOffer(id){
 }
 function propose(){
   const P=player();if(!P.region)return;
-  const gG=$('pGive').value,wG=$('pWant').value;let amt=isTool(gG)?1:r1(parseFloat($('pAmt').value)||0);
+  const gG=$('pGive').value,wG=$('pWant').value;
+  if(!ITEMS[gG]||!ITEMS[wG]){S.ui.msg='出すものと欲しいものを選ぶ。';return render()}
+  let amt=isTool(gG)?1:whole(gG)?Math.round(parseFloat($('pAmt').value)||0):r1(parseFloat($('pAmt').value)||0);
   if(gG===wG){S.ui.msg='出すものと欲しいものが同じだ。';return render()}
-  if(amt<=0||cnt(P,gG)<amt){S.ui.msg=`手元の${ITEMS[gG].name}は${q(gG,cnt(P,gG))}しかない。`;return render()}
-  let best=null;const disc=.03*Math.max(0,titleLv()-2);/* 長老以上には相手が少し譲る */
+  if(whole(gG)&&amt<1){S.ui.msg=`${ITEMS[gG].name}は分けられない。1つ単位で出す。`;return render()}
+  if(amt<=0||!enough(P,gG,amt)){S.ui.msg=`手元の${ITEMS[gG].name}は${q(gG,cnt(P,gG))}しかない。`;return render()}
+  /* 相手が困っていても、相場の1.5倍より得な取引にはならない(困った相手から搾り取れないように) */
+  let best=null;const disc=.03*Math.max(0,titleLv()-2),fairCap=1.5;/* 長老以上には相手が少し譲る */
   for(const a of ais()){
-    const avail=surplus(a,wG);if(avail<(isTool(wG)?1:.1))continue;
+    const avail=surplus(a,wG);if(avail<(isTool(wG)||whole(wG)?1:.1))continue;
     const needs=deficit(a,gG)>0;const asMoney=!needs&&!isTool(gG)&&S.money[gG]>a.thresh;if(!needs&&!asMoney)continue;
     const gv=needs?agentVal(a,gG):S.prices[gG];
-    if(isTool(wG)){const req=r1(S.prices[wG]*(.95-disc)/gv+.05);if(amt>=req&&(!best||req<best.pay))best={a,get:1,pay:isTool(gG)?1:req,med:asMoney?gG:null}}
-    else{const get=Math.min(avail,amt*gv/agentVal(a,wG)*(.95+disc));if(get>=.1&&(!best||get>best.get))best={a,get:r1(get),pay:amt,med:asMoney?gG:null}}
+    if(isTool(wG)){let req=Math.max(S.prices[wG]*(.95-disc)/gv,S.prices[wG]/S.prices[gG]/fairCap)+.05;req=whole(gG)?Math.ceil(req):r1(req);
+      if(amt>=req&&(!best||req<best.pay))best={a,get:1,pay:isTool(gG)?1:req,med:asMoney?gG:null}}
+    else{let get=Math.min(avail,amt*gv/agentVal(a,wG)*(.95+disc),amt*S.prices[gG]/S.prices[wG]*fairCap);get=whole(wG)?Math.floor(get):Math.floor(get*10)/10;
+      if(get>=(whole(wG)?1:.1)&&(!best||get>best.get))best={a,get,pay:amt,med:asMoney?gG:null}}
   }
   if(!best){S.ui.msg=`${ITEMS[wG].name}を${ITEMS[gG].name}と換えてくれる人はいなかった。相手が${ITEMS[gG].name}を必要としていないか、${ITEMS[wG].name}に余りがない。`;return render()}
   exchange(P,best.a,gG,best.pay,wG,best.get,best.med);S.stat.trade++;
@@ -599,7 +614,7 @@ function teachOffer(rid){
     let kv=des?toolUse(a,rid)*.6:Math.max(0,agentVal(a,r.out)-Object.entries(r.in).reduce((s,[g,n])=>s+n*S.prices[g],0))*3;
     const pv=kv*.5;if(pv<.5)continue;
     const g=GOODS.filter(g=>surplus(a,g)>.1).sort((x,y)=>S.money[y]-S.money[x]||S.prices[y]-S.prices[x])[0];if(!g)continue;
-    const amt=r1(Math.min(surplus(a,g),pv/S.prices[g]*(1+.1*titleLv())));if(amt<.1)continue;
+    const raw=Math.min(surplus(a,g),pv/S.prices[g]*(1+.1*titleLv())),amt=whole(g)?Math.floor(raw):Math.floor(raw*10)/10;if(amt<(whole(g)?1:.1))continue;
     if(!best||amt*S.prices[g]>best.amt*S.prices[best.g])best={aid:a.id,g,amt,rid};
   }
   S.ui.teach=best||{none:true,rid};render();
@@ -740,21 +755,23 @@ function finishWork(k){const w=S.works[k],W=WORKS[k];w.done=S.day;addFame(8);
   const who=Object.entries(w.by).sort((x,y)=>y[1]-x[1]).map(x=>x[0]);
   logIt(`${W.name}が完成した! ${W.effect} 力を貸した人: ${who.slice(0,6).join('・')}${who.length>6?` ほか${who.length-6}人`:''}`,'work');
   toast(`<b>完成!</b> ${W.name}`,'jackpot',4200)}
+/* 名声に数える値打ち。相場で数えるが、基準値の0.5〜1.5倍に収める(安い材料で名声を稼ぎすぎないように、高騰した珍品で跳ね上がらないように) */
+const workVal=(g,n)=>r1(n*Math.min(ITEMS[g].base*1.5,Math.max(ITEMS[g].base*.5,S.prices[g])));
 const rareToGive=P=>RARES.filter(g=>cnt(P,g)>=1).sort((x,y)=>S.prices[x]-S.prices[y])[0];
 /* 「出す」ボタンで出す量。木材は薪の分を1残す */
 function giveAmt(P,k,g){const x=Math.min(workLeft(k,g),Math.max(0,cnt(P,g)-(g==='wood'?1:0)));return x>=workLeft(k,g)?workLeft(k,g):Math.floor(x*10)/10}
 function playerGive(P,k,g,n){
-  if(g==='rare'){const r=rareToGive(P);if(!r||workLeft(k,'rare')<1)return 0;take(P,r,1);const v=ITEMS[r].base;S.stat.work++;addFame(v);giveWork(k,'あなた','rare',1,v);
+  if(g==='rare'){const r=rareToGive(P);if(!r||workLeft(k,'rare')<1)return 0;take(P,r,1);const v=workVal(r,1);S.stat.work++;addFame(v);giveWork(k,'あなた','rare',1,v);
     logIt(`あなたは${WORKS[k].name}に${ITEMS[r].name}を供えた。`,'you');return v}
   if(g==='labor'){if(P.labor<1||workLeft(k,'labor')<=0)return 0;P.labor--;S.stat.work++;addFame(LABOR_VAL);giveWork(k,'あなた','labor',1,LABOR_VAL);return LABOR_VAL}
-  if(n<=0||cnt(P,g)<n)return 0;take(P,g,n);const v=r1(n*ITEMS[g].base);S.stat.work++;addFame(v);giveWork(k,'あなた',g,n,v);return v}
+  if(n<=0||!enough(P,g,n))return 0;take(P,g,n);const v=workVal(g,n);S.stat.work++;addFame(v);giveWork(k,'あなた',g,n,v);return v}
 function workGive(P,k,g){if(!k||activeWork()!==k)return;const n=g==='labor'||g==='rare'?1:giveAmt(P,k,g);const v=playerGive(P,k,g,n);
   if(v)toast(`${workGl(g)} ${workName(g)}${g==='labor'?'を出した':g==='rare'?'を供えた':q(g,n)+'を出した'}(名声+${r1(v)})`,'good')}
 /* 財で賄う: 村人の余りを相場の3割増しで買い集める。人手は穀物2の値打ちで1日雇う。
  * 払いには珍品も使える(ためた財の使い道)。食べ物は使わず、塩と木材は1ずつ残す */
 function hirePay(P,value,ex){
-  /* 0.1刻みで払う。端数で払いすぎになる品(高い珍品で小さな買い物など)は後回し */
-  const c=GOODS.filter(g=>g!==ex&&ITEMS[g].cat!=='food').map(g=>{const amt=Math.ceil(value/S.prices[g]*10-1e-9)/10;
+  /* 0.1刻みで払う(珍品・首飾りは1つ単位)。端数で払いすぎになる品(高い珍品で小さな買い物など)は後回し */
+  const c=GOODS.filter(g=>g!==ex&&ITEMS[g].cat!=='food').map(g=>{const u=whole(g)?1:10,amt=Math.ceil(value/S.prices[g]*u-1e-9)/u;
     return{g,amt,over:amt*S.prices[g]/value,sc:S.money[g]*10+S.prices[g]}}).filter(x=>cnt(P,x.g)-(x.g==='salt'||x.g==='wood'?1:0)>=x.amt);
   const best=c.filter(x=>x.over<=1.5).sort((x,y)=>y.sc-x.sc)[0]||c.sort((x,y)=>x.over-y.over)[0];
   return best?{g:best.g,amt:best.amt}:null}
@@ -764,19 +781,21 @@ function hireQuote(P,k,g){const left=workLeft(k,g);if(left<=0||g==='rare')return
   return{n,pay:hirePay(P,n*S.prices[g]*1.3,g)}}
 function workHire(P,k,g){if(!k||activeWork()!==k)return;const qt=hireQuote(P,k,g);if(!qt||!qt.n||!qt.pay||cnt(P,qt.pay.g)<qt.pay.amt)return;
   const{n,pay}=qt;take(P,pay.g,pay.amt);S.stat.work++;
-  if(g==='labor'){const hs=shuffle(ais().filter(a=>a.health>50)).slice(0,Math.ceil(n));
-    for(const a of hs){add(a,pay.g,r2(pay.amt/hs.length));giveWork(k,a.name,'labor',n/hs.length,n/hs.length*LABOR_VAL)}
+  /* 払いは働いた人で分ける。分けられない品は、いちばん多く働いた1人にまとめて渡す */
+  const share=(a,f)=>add(a,pay.g,whole(pay.g)?(f===1||first0===a?pay.amt:0):r2(pay.amt*f));let first0=null;
+  if(g==='labor'){const hs=shuffle(ais().filter(a=>a.health>50)).slice(0,Math.ceil(n));first0=hs[0];
+    for(const a of hs){share(a,1/hs.length);giveWork(k,a.name,'labor',n/hs.length,n/hs.length*LABOR_VAL)}
     addFame(r1(n*LABOR_VAL*.5))}
   else{let rest=n;for(const a of ais().slice().sort((x,y)=>surplus(y,g)-surplus(x,g))){if(rest<=0)break;
-      const t=Math.min(rest,surplus(a,g));if(t<=0)continue;take(a,g,t);add(a,pay.g,r2(pay.amt*t/n));rest=r2(rest-t);giveWork(k,a.name,g,t,t*ITEMS[g].base)}
-    addFame(r1(n*ITEMS[g].base*.5))}
+      const t=Math.min(rest,surplus(a,g));if(t<=0)continue;if(!first0)first0=a;take(a,g,t);share(a,t/n);rest=r2(rest-t);giveWork(k,a.name,g,t,workVal(g,t))}
+    addFame(r1(workVal(g,n)*.5))}
   logIt(`あなたは${ITEMS[pay.g].name}${q(pay.g,pay.amt)}を払い、村人に頼んで${workName(g)}${workQ(g,n)}を${WORKS[k].name}に回してもらった。`,'you');
   toast(`${workGl(g)} ${workName(g)}${workQ(g,n)}が集まった`,'good')}
 /* 村人の手伝い。あなたの肩書きが上がるほど、手を貸す人が増える */
 function worksDay(){const k=activeWork();if(!k)return;const need=WORKS[k].need,p=[.03,.06,.12,.18,.28][titleLv()];
   for(const a of shuffle(ais())){if(S.works[k].done)break;if(a.health<60||Math.random()>p)continue;
     const mats=Object.keys(need).filter(g=>g!=='labor'&&g!=='rare'&&workLeft(k,g)>0&&surplus(a,g)>.5);
-    if(mats.length&&Math.random()<.7){const g=rnd(mats),n=r1(Math.min(surplus(a,g)*.4,2,workLeft(k,g)));if(n>0){take(a,g,n);giveWork(k,a.name,g,n,n*ITEMS[g].base)}}
+    if(mats.length&&Math.random()<.7){const g=rnd(mats),n=r1(Math.min(surplus(a,g)*.4,2,workLeft(k,g)));if(n>0){take(a,g,n);giveWork(k,a.name,g,n,workVal(g,n))}}
     else if(workLeft(k,'labor')>0){const n=Math.min(.5,workLeft(k,'labor'));giveWork(k,a.name,'labor',n,n*LABOR_VAL)}}}
 /* おまかせのとき: 呼びかけて、余った物と労力1を出す */
 function autoWorks(P){
@@ -809,7 +828,7 @@ const AYUMI=[
   {id:'kaoyaku',name:'顔役',desc:'肩書き「顔役」になる',t:P=>(P.title||0)>=2},
   {id:'spread',name:'広まる型',desc:'自分の考えた型を村人3人が使えるようになる',t:()=>Object.entries(S.designs).some(([k,d])=>d.by==='あなた'&&ais().filter(a=>a.known.includes(k)).length>=3)},
   {id:'master',name:'名品',desc:'名品の道具を作る',t:()=>S.stat.master>=1},
-  {id:'deep',name:'奥地へ',desc:'遠出で5歩奥まで無事に進む',t:()=>S.stat.expMax>=5},
+  {id:'deep',name:'奥地へ',desc:'遠出で4歩奥まで無事に進む',t:()=>S.stat.expMax>=4},
   {id:'rare3',name:'目利き',desc:'珍品を3種類見つける',t:()=>RARES.filter(g=>S.found[g]).length>=3},
   {id:'copper',name:'金属の時代',desc:'鉱石を溶かして銅を作る',t:()=>S.stat.smelt>=1},
   {id:'rich',name:'村一番の分限者',desc:'持ち物の値打ちの合計が村で一番になる',t:P=>S.day>=10&&ais().every(a=>wealth(a)<wealth(P))},
@@ -892,9 +911,11 @@ function renderYou(P){
   const shown=GOODS.filter(g=>cnt(P,g)>.04||['salt','wood'].includes(g));
   const chip=g=>`<span class="it ${need[g]&&cnt(P,g)<need[g]?'low':''}">${gl(g)}${ITEMS[g].name}<b>${q(g,cnt(P,g))}</b></span>`;
   const food=shown.filter(g=>ITEMS[g].cat==='food').map(chip), rest=shown.filter(g=>ITEMS[g].cat!=='food'&&ITEMS[g].cat!=='rare').map(chip), rares=shown.filter(g=>ITEMS[g].cat==='rare').map(chip);
-  const tools=TOOLS.filter(t=>cnt(P,t)>=1).map(t=>`<span class="it">${gl(t)}${ITEMS[t].name}<b>${q(t,cnt(P,t))}</b><small>残り${curDur(P,t)}回${curDur(P,t)>ITEMS[t].dur?' ★':''}</small></span>`);
+  /* 同じ道具を何本か持っているときは、1本ずつの残り回数を並べる(先に使うのは左) */
+  const tools=TOOLS.filter(t=>cnt(P,t)>=1).map(t=>{const ds=P.durs[t]||[curDur(P,t)];
+    return `<span class="it">${gl(t)}${ITEMS[t].name}<b>${q(t,cnt(P,t))}</b><small>残り${ds.join('・')}回${ds.some(d=>d>ITEMS[t].dur)?' ★':''}</small></span>`});
   const ft=foodTotal(P),lv=P.title||0,T=TITLES[lv],N=TITLES[lv+1],goal=nextGoal();
-  const rank=`<div class="rank"><span class="tn">${T.name}</span><span class="num">名声 ${r1(P.fame||0)}</span>${N?`<span class="sb"><i style="width:${Math.min(100,(P.fame||0)/N.fame*100)}%"></i></span>
+  const rank=`<div class="rank"><span class="tn">${T.name}</span><span class="num">名声 ${Math.floor(P.fame||0)}</span>${N?`<span class="sb"><i style="width:${Math.min(100,(P.fame||0)/N.fame*100)}%"></i></span>
     <small>次は「${N.name}」: 名声${N.fame}${N.works?`・大事業を${N.works}つ完成(いま${worksDone()})`:''}。${N.perk}</small>`:'<span></span><small>村でいちばん頼られる人になった。</small>'}</div>`;
   $('you').innerHTML=`<h2>あなたの暮らし <small>${REG[P.region].name}・食べ物は約${Math.floor(ft/2)}日分</small></h2>
     ${seen('fame')?rank:''}${goal?`<p class="goal">次の目標 <b>${goal.name}</b> ${goal.desc}</p>`:''}
@@ -940,7 +961,7 @@ function renderWork(P){
     if(S.omen===g&&i.y>0)sub='吉兆・'+sub;
     return `<button class="act ${S.omen===g?'omen':''}" data-gather="${g}" ${i.y<=0||P.labor<1?'disabled':''}>${gl(g)}<span class="an">${d.name}<span class="as">${sub}</span></span><span class="ay">${i.y>0?'約'+q(g,i.y):''}</span></button>`});
   const fi=fieldInfo(P);const fc=facCount(P,'field');
-  if(fc)rows.push(`<button class="act" data-field="1" ${(!fi.ripe&&!(fi.empty&&cnt(P,'grain')>=1))||P.labor<1?'disabled':''}>${gl('grain')}<span class="an">畑仕事<span class="as">実った畑${fi.ripe}・空いた畑${fi.empty}${fi.empty&&cnt(P,'grain')<1&&!fi.ripe?'・種の穀物がない':''}</span></span><span class="ay">${fi.ripe?'+'+q('grain',fi.yieldSum):''}</span></button>`);
+  if(fc)rows.push(`<button class="act" data-field="1" ${(!fi.ripe&&!(fi.empty&&cnt(P,'grain')>=1))||P.labor<1?'disabled':''}>${gl('grain')}<span class="an">畑仕事<span class="as">実った畑${fi.ripe}・育っている畑${fi.growing}・空いた畑${fi.empty}${fi.empty&&cnt(P,'grain')<1&&!fi.ripe?'・種の穀物がない':''}</span></span><span class="ay">${fi.ripe?'+'+q('grain',fi.yieldSum):''}</span></button>`);
   rows.push(`<button class="act" data-exp="1" ${P.labor<1?'disabled':''}><span class="gl c-rare">遠</span><span class="an">遠出する<span class="as">1歩ごとに労力1。奥ほど実入りも危険も大きい${S.ui.map?'・地図あり':''}</span></span><span class="ay">?</span></button>`);
   rows.push(`<button class="act" data-rest="1" ${P.labor<1?'disabled':''}><span class="gl c-tool">休</span><span class="an">休む<span class="as">体力を少し取り戻す</span></span><span class="ay">+6</span></button>`);
   $('work').innerHTML=`<h2>仕事 <small>1回に労力1を使う・数字はとれる量の目安。運しだいで外れも大当たりもある</small></h2><div class="acts">${rows.join('')}</div>`;
@@ -998,7 +1019,7 @@ function renderCalls(P){const el=$('calls');if(!P.region||P.health<=0||!S.offers
     <div class="offers">${S.offers.map(o=>{const a=S.agents.find(x=>x.id===o.aid);if(!a)return'';
     return `<div class="offer"><div><div class="who">${a.name}・${REG[a.region].name}${o.why?`「${o.why}」`:''}</div>
       <div class="deal">${gl(o.give.g)}<span class="num">${q(o.give.g,o.give.amt)}</span>を渡す → ${gl(o.get.g)}<span class="num">${q(o.get.g,o.get.amt)}</span>をもらう ${o.medium?`<span class="tag">${ITEMS[o.medium].name}で支払い</span>`:''}</div></div>
-      <button class="btn small" data-offer="${o.id}" ${cnt(P,o.give.g)<o.give.amt?'disabled':''}>応じる</button></div>`}).join('')}</div>
+      <button class="btn small" data-offer="${o.id}" ${!enough(P,o.give.g,o.give.amt)?'disabled':''}>応じる</button></div>`}).join('')}</div>
     <p class="note">困っている人に応じると名声が上がる。</p>`}
 function renderWorks(P){const k=activeWork();let cur='';
   if(k){const W=WORKS[k],w=S.works[k];
@@ -1034,10 +1055,13 @@ function renderMarket(P){
   else $('offers').innerHTML=`<div class="empty">${S.offers.length?`今日は${S.offers.length}人から声がかかっている。画面上の「声がかかっています」から応じられる。`:'今日は誰も声をかけてこない。下から自分で相手を探せる。'}</div>`;
   const dem=ORDER.map(g=>{let D=0,Su=0;for(const a of ais()){if(isTool(g)){if(cnt(a,g)<1&&a.want[g])D++}else D+=deficit(a,g);Su+=surplus(a,g)}return{g,v:D-Su}}).filter(x=>x.v>.5).sort((x,y)=>y.v-x.v).slice(0,7);
   $('demand').innerHTML=dem.length?dem.map(x=>`<span>${gl(x.g,1)} ${ITEMS[x.g].name}</span>`).join(''):'<span>特になし</span>';
-  const opts=ORDER.map(g=>`<option value="${g}">${ITEMS[g].name}</option>`).join('');
-  for(const id of['pGive','pWant']){const el=$(id);const v=el.value;if(el.options.length!==ORDER.length)el.innerHTML=opts;if(v)el.value=v}
-  if(!$('pWant').dataset.init){$('pGive').value='berries';$('pWant').value='salt';$('pWant').dataset.init=1}
-  $('pGo').disabled=!P.region||P.health<=0;
+  /* 出すものは手元にある物だけ(量も添える)。欲しいものは何でも選べる */
+  const have=ORDER.filter(g=>isTool(g)?cnt(P,g)>=1:cnt(P,g)>=.05);
+  const setOpts=(id,list,label,def)=>{const el=$(id),v=el.value,html=list.map(g=>`<option value="${g}">${label(g)}</option>`).join('');
+    if(el.dataset.opts!==html){el.innerHTML=html;el.dataset.opts=html}el.value=list.includes(v)?v:list.includes(def)?def:(list[0]||'')};
+  setOpts('pGive',have,g=>`${ITEMS[g].name}(${q(g,cnt(P,g))})`,'berries');
+  setOpts('pWant',ORDER,g=>ITEMS[g].name,'salt');
+  $('pGo').disabled=!P.region||P.health<=0||!have.length;
   $('pMsg').innerHTML=S.ui.msg?`<div class="msg">${S.ui.msg}</div>`:'';
 }
 function renderMoney(){

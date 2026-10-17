@@ -97,7 +97,7 @@ function screen() {
   for (const [letter, title, id] of PANELS) {
     let html;
     if (id === 'status') html = h('status') + `<div><button id="end"${els.end && els.end.disabled ? ' disabled' : ''}>日を終える</button> <button id="auto"${els.auto && els.auto.disabled ? ' disabled' : ''}>おまかせで進める(auto 日数 でも可)</button></div>`;
-    else if (id === 'market') html = `<h2>市場</h2>${h('offers')}<h3>いま村で足りない物</h3><div>${h('demand')}</div><h3>自分から持ちかける</h3><div>trade 出す品 量 欲しい品 で相手を探す${els.pGo && els.pGo.disabled ? '(今はできない)' : ''}</div>${h('pMsg')}`;
+    else if (id === 'market') html = `<h2>市場</h2>${h('offers')}<h3>いま村で足りない物</h3><div>${h('demand')}</div><h3>自分から持ちかける</h3><div>trade 出す品 量 欲しい品 で相手を探す${els.pGo && els.pGo.disabled ? '(今はできない)' : ''}</div><div>出せる物: ${(h('pGive').match(/>[^<]+</g) || []).map(s => s.slice(1, -1)).join('・') || 'なし'}</div>${h('pMsg')}`;
     else if (id === 'moneyP') { if (!vis(id)) continue; html = `<h2>お金の芽</h2><p>${h('moneyLead')}</p>${h('money')}`; }
     else if (id === 'pricesP') { if (!vis(id)) continue; html = `<h2>物価</h2><p>${els.unitNote ? els.unitNote.textContent : ''}</p>${h('prices')}${els.chart && !els.chart.parentElement.hidden ? '<p>(物価の推移のグラフ)</p>' : ''}`; }
     else if (id === 'logP') { const items = h('log').match(/<li[\s\S]*?<\/li>/g) || []; html = `<h2>年代記</h2><ul>${items.slice(0, 10).join('')}</ul>${items.length > 10 ? '<p>(古い記録は省略)</p>' : ''}${h('resetBox')}`; }
