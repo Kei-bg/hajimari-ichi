@@ -26,13 +26,17 @@ const ITEMS={
   meteor:{name:'隕鉄',ch:'隕',cat:'rare',decay:0,port:.6,base:40,rare:4},
   necklace:{name:'首飾り',ch:'飾',cat:'rare',decay:0,port:1,base:18},
   blade:{name:'石刃',ch:'片',cat:'mat',decay:0,port:.8,base:2.2},
+  jerky:{name:'干し肉',ch:'脯',cat:'food',decay:.01,port:.9,base:3},
+  medicine:{name:'煎じ薬',ch:'薬',cat:'mat',decay:0,port:.9,base:4},
+  sake:{name:'酒',ch:'酒',cat:'pot',decay:0,port:.7,base:6},
+  tablet:{name:'古い石板',ch:'板',cat:'rare',decay:0,port:.5,base:10,rare:2},
   net:{name:'網',ch:'網',cat:'tool',dur:20,base:8,jobs:{fish:3.2}},
 };
 ITEMS.pot.jobs={salt:1.8};
 let ORDER=Object.keys(ITEMS),TOOLS=ORDER.filter(g=>ITEMS[g].dur);
 const GOODS=ORDER.filter(g=>!ITEMS[g].dur);
 function refreshKeys(){ORDER=Object.keys(ITEMS);TOOLS=ORDER.filter(g=>ITEMS[g].dur)}
-const FOOD=['meat','fish','berries','grain'];
+const FOOD=['meat','fish','berries','grain','jerky'];
 const isTool=g=>!!(ITEMS[g]&&ITEMS[g].dur);
 /* 分けられない品(珍品と首飾り)。金の粒だけは粒なので分けられる。あなたが払う・受け取るときは1つ単位にする */
 const whole=g=>!!ITEMS[g]&&ITEMS[g].cat==='rare'&&g!=='gold';
@@ -64,7 +68,12 @@ const RECIPES=[
   {id:'smelt',in:{ore:2,charcoal:2},out:'copper',needs:'kiln',tier:3,short:'鉱石を炭火で溶かすと、赤く光る金属が流れ出た。銅。'},
   {id:'neck_p',in:{pearl:1,rope:1},out:'necklace',tier:2,short:'真珠を縄に通した首飾り。身につけると毎日の体力が少し上がり、誰もが欲しがる。'},
   {id:'neck_a',in:{amber:1,rope:1},out:'necklace',tier:2,short:'琥珀を縄に通した首飾り。身につけると毎日の体力が少し上がり、誰もが欲しがる。'},
+  /* 秘伝: 材料を持っても思いつかない。遠出・旅人・商人・古い石板・社から知るか、知っている人に教わる */
+  {id:'jerky',in:{meat:2,salt:.3},out:'jerky',n:2,tier:2,secret:true,short:'獣の肉に塩をすり込んで干す。ほとんど傷まない保存食。'},
+  {id:'medicine',in:{fiber:2,berries:1},out:'medicine',tier:2,secret:true,short:'薬草を煮出した薬。体が弱ったとき(体力70未満)に自然と飲み、体力が15戻る。'},
+  {id:'sake',in:{grain:3,berries:1},out:'sake',tier:2,secret:true,short:'穀物と木の実を醸した酒。腐らず、暮らしに余裕のある人が欲しがる。祭りでふるまうと名声が上がる。'},
 ];
+const SECRETS=RECIPES.filter(r=>r.secret);
 const RID=Object.fromEntries(RECIPES.map(r=>[r.id,r]));
 const FAC={
   field:{name:'畑',ch:'畑',on:['soil'],labor:3,laborHoe:1,mat:{},needJob:'dig',desc:'穀物を植えて5日で実る。種に穀物1を使う。',tip:'川か水路の隣なら収穫1.5倍'},
@@ -100,7 +109,7 @@ const EVENTS={
 const RARITY={1:'珍しい',2:'とても珍しい',3:'幻の',4:'伝説の'};
 const RARES=['obsidian','fossil','amber','pearl','gold','jade','meteor'];
 const RARE_DROP={stone:[['obsidian',.04],['fossil',.012],['gold',.005]],fish:[['pearl',.03,'shore']],wood:[['amber',.02]],berries:[['amber',.012]],
-  clay:[['gold',.012],['fossil',.015]],ore:[['gold',.03],['meteor',.004]],salt:[['pearl',.012]],fiber:[],grain:[]};
+  clay:[['gold',.012],['fossil',.015],['tablet',.005]],ore:[['gold',.03],['meteor',.004]],salt:[['pearl',.012]],fiber:[],grain:[]};
 const OMENS={berries:'森がざわめく。木の実日和',grain:'穂が重く垂れる。摘み取り日和',fish:'水面がきらめく。漁日和',wood:'風が乾いている。伐採日和',stone:'岩場で何かが光った。石拾い日和',
   clay:'雨上がりで土がやわらかい。粘土日和',fiber:'草がよく伸びた。草刈り日和',salt:'日差しが強い。塩づくり日和',ore:'山が低く鳴った。鉱石日和'};
 const HAZ=[{t:'猪に突き飛ばされた。',d:16},{t:'崖で足を滑らせた。',d:12},{t:'道に迷い、夜通し歩き回った。',d:10},{t:'毒のある実に当たった。',d:14},{t:'蛇に噛まれた。',d:18}];
@@ -148,7 +157,7 @@ function freshWorld(){
   S.agents.push(newAgent(null,true));
   for(const r of['plain','plain','river','river','coast','coast','forest','forest'])S.agents.push(newAgent(r,false));
   /* 縄をなう・石を打ち欠くくらいは、手元の材料で誰でも知っている */
-  for(const a of ais())for(const r of inspire(a))S.firstBy[r.id]=S.firstBy[r.id]||a.name;
+  for(const a of ais()){for(const r of inspire(a))S.firstBy[r.id]=S.firstBy[r.id]||a.name;knowBasics(a)}
   logIt('何もない土地に、8人の人々が暮らしている。道具はまだなく、誰もが素手で木の実や草を集めている。縄をなうことと、石を打ち欠くことくらいは誰でも知っている。','event');
   pushHist();
 }
@@ -217,6 +226,9 @@ function defineDesign(key){if(ITEMS[key])return;const d=designCalc(key);
 function registerDesign(key,by){defineDesign(key);if(S.designs[key])return false;S.designs[key]={by,day:S.day};S.prices[key]=ITEMS[key].base;S.money[key]=0;return true}
 function learnDesign(a,key,by){const nw=registerDesign(key,by||a.name);if(!a.known.includes(key))a.known.push(key);return nw}
 const isDesign=g=>!!(ITEMS[g]&&ITEMS[g].design);
+/* 木・石・石刃を先端にした型は、誰でも手元の材料で思いつく(村人も知っている。教えても礼にならない) */
+const COMMON_HEAD=['wood','stone','blade'];
+const commonDesign=k=>isDesign(k)&&COMMON_HEAD.includes(ITEMS[k].design.m);
 function bestPower(a,job,xj){let v=0,t=null;
   for(const g in a.inv){if(a.inv[g]<1)continue;const j=ITEMS[g]&&ITEMS[g].jobs;if(j&&j[job]>v){v=j[job];t=g}}
   if(xj&&xj[job]>v){v=xj[job];t=null}return{v,t}}
@@ -233,7 +245,7 @@ function craftDesign(a,key){if(designWhy(a,key))return false;const nw=learnDesig
   if(Q[1]==='名品の'&&!a.isPlayer)logIt(`${a.name}が名品の${d.name}を作り上げた。`,'tech');
   return{out:key,n:1,ql:Q[1],dur,first:nw}}
 function giftDesign(P,by){let best=null,bv=0;
-  for(const m of['stone','blade','obsidian','copper'])for(const sh of Object.keys(SHAPES))for(const h of['short','long']){
+  for(const m of['obsidian','copper'])for(const sh of Object.keys(SHAPES))for(const h of['short','long']){
     const k=dkey(sh,m,h,'rope');if(P.known.includes(k))continue;const d=ITEMS[k]||designCalc(k);const v=toolUseJobs(P,d.jobs,d.dur)+Math.random();if(v>bv){bv=v;best=k}}
   if(best)learnDesign(P,best,by);return best}
 
@@ -275,7 +287,7 @@ function doField(a){
   a.labor--;return{g:'grain',amt:r2(got),tier:bumper?'jackpot':'norm',field:true};
 }
 function recipeIn(a,r){const m={...r.in};if(r.id==='charcoal'&&a.plot&&kilnAdj(a,'forest'))m.wood=2;return m}
-const recipeOut=(a,r)=>r.id==='pot'&&a.plot&&kilnAdj(a,'clay')?2:1;
+const recipeOut=(a,r)=>r.id==='pot'&&a.plot&&kilnAdj(a,'clay')?2:(r.n||1);
 function craftWhy(a,r){
   if(r.needs&&!hasFac(a,r.needs))return'窯が要る';
   const miss=Object.entries(recipeIn(a,r)).filter(([g,n])=>!enough(a,g,n)).map(([g,n])=>`${ITEMS[g].name}${q(g,n-cnt(a,g))}`);
@@ -346,6 +358,8 @@ function addInputs(w,a,r,mult,depth){
   for(const[g,n]of Object.entries(recipeIn(a,r))){w[g]=(w[g]||0)+n*mult;
     const sub=recipeFor(g);if(depth<2&&sub&&cnt(a,g)<n&&knows(a,sub.id))addInputs(w,a,sub,n-cnt(a,g),depth+1)}
 }
+/* 秘伝の品が村に出回っているか(誰かが作り方を知っているか、持っているか) */
+const inVillage=rid=>S.agents.some(o=>o.known.includes(rid)||cnt(o,RID[rid].out)>0);
 function computeWant(a){
   const w={berries:2,grain:2+facCount(a,'field'),fish:2,salt:1.2,wood:2,pot:1};
   let best=null,bv=3;for(const t of TOOLS){if(cnt(a,t)>0)continue;const v=toolUse(a,t);if(v>bv){bv=v;best=t}}
@@ -358,7 +372,9 @@ function computeWant(a){
   /* お金として通用している物は、いざという時のために手元に置いておきたくなる */
   for(const g of GOODS)if(S.money[g]>.3)w[g]=(w[g]||0)+8*S.money[g]/S.prices[g];
   /* 暮らしに余裕のある者は飾りや貴石を欲しがる */
-  if(foodTotal(a)>10&&a.health>80){w.necklace=(w.necklace||0)+1;w.gold=(w.gold||0)+.5;w.pearl=(w.pearl||0)+.3;w.jade=(w.jade||0)+.2}
+  if(foodTotal(a)>10&&a.health>80){w.necklace=(w.necklace||0)+1;w.gold=(w.gold||0)+.5;w.pearl=(w.pearl||0)+.3;w.jade=(w.jade||0)+.2;if(inVillage('sake'))w.sake=(w.sake||0)+.6}
+  /* 保存食と薬は、村に出回り始めたら手元に置きたくなる */
+  if(inVillage('jerky'))w.jerky=(w.jerky||0)+1;if(inVillage('medicine'))w.medicine=(w.medicine||0)+(a.health<70?2:.5);
   a.want=w;a.facGoal=bf;
 }
 function agentVal(a,g){
@@ -393,23 +409,26 @@ function aiInvent(a){
   for(const m of heads)for(const sh in SHAPES)for(const h in HANDLES)for(const b of(h==='none'?['none']:binds)){
     const k=dkey(sh,m,h,b);if(a.known.includes(k))continue;const d=ITEMS[k]||designCalc(k);
     const v=toolUseJobs(a,d.jobs,d.dur)-.5*Object.entries(d.mat).reduce((x,[g,n])=>x+n*S.prices[g],0);if(v>bv){bv=v;best=k}}
-  if(best&&!a.isPlayer){const nw=learnDesign(a,best);if(nw)logIt(`${a.name}が「${ITEMS[best].name}」という道具を考え出した。`,'tech')}
+  if(best&&!a.isPlayer){const nw=learnDesign(a,best);if(nw&&!commonDesign(best))logIt(`${a.name}が「${ITEMS[best].name}」という道具を考え出した。`,'tech')}
   else if(best)learnDesign(a,best);
 }
+/* 基本の型(木・石・石刃の先端)のうち、自分の土地で役立つものは最初から知っている */
+function knowBasics(a){for(let i=0;i<3;i++)aiInvent(a)}
 function aiLearn(){
   for(const a of ais()){
-    if(Math.random()<.04)aiInvent(a);
+    /* 暮らしが変わると役立つ型も変わるので、ときどき見直す */
+    if(Math.random()<.2)aiInvent(a);
     let bk=null,bv=1;for(const k in S.designs){if(a.known.includes(k))continue;const v=toolUse(a,k);if(v>bv){bv=v;bk=k}}
     if(bk){const kn=S.agents.filter(o=>o!==a&&o.known.includes(bk)).length;if(Math.random()<Math.min(.2,.02*kn)){a.known.push(bk);
       /* あなたが考え出した型が広まると、名声が上がる */
-      if(S.designs[bk].by==='あなた')addFame(1)}}
+      if(S.designs[bk].by==='あなた'&&!commonDesign(bk))addFame(1)}}
   }
   for(const a of ais()){
     for(const r of inspire(a))if(!S.firstBy[r.id]){S.firstBy[r.id]=a.name;logIt(`${a.name}が${ITEMS[r.out].name}の作り方を考え出した。${r.short}`,'tech')}
     /* 材料を持っていなくても、知っている人が多ければ見よう見まねで覚える */
     for(const r of RECIPES){if(r.auto||a.known.includes(r.id)||(r.needs&&!hasFac(a,r.needs)))continue;
       const k=S.agents.filter(o=>o!==a&&o.known.includes(r.id)).length;
-      if(k&&Math.random()<Math.min(.25,.015*k))a.known.push(r.id)}
+      if(k&&Math.random()<(r.secret?Math.min(.05,.004*k):Math.min(.25,.015*k)))a.known.push(r.id)}
   }
 }
 
@@ -453,7 +472,7 @@ function endDay(){
   if(S.card){if(!S.card.result)logIt(`【${S.card.title}】何もしないまま一日が過ぎた。`,'you');S.card=null}
   if(autoTimer){if(Math.random()<.06)aiInvent(P);autoWorks(P);runAgent(P)}
   for(const a of shuffle(ais())){a.labor=4;runAgent(a)}
-  aiLearn();
+  aiLearn();readTablets();
   const pop=ais();for(let i=0;i<pop.length*(built('square')?8:5);i++){const a=rnd(pop),b=rnd(pop);if(a!==b)tryTrade(a,b)}
   worksDay();
   for(const a of live()){
@@ -479,6 +498,7 @@ function consume(a){
   /* 塩と木材は手元にある分を使い、足りない分に応じて体力が減る */
   const salt=Math.min(cnt(a,'salt'),.2),wood=Math.min(cnt(a,'wood'),.3);
   take(a,'salt',salt);take(a,'wood',wood);dh-=4*(.2-salt)/.2+3*(.3-wood)/.3;
+  if(a.health+dh<70&&cnt(a,'medicine')>=1){take(a,'medicine',1);dh+=15;if(a.isPlayer)logIt('あなたは煎じ薬を飲んだ。体力+15。','you')}
   a.health=Math.max(0,Math.min(100,a.health+dh));
 }
 function decay(a){
@@ -512,7 +532,7 @@ function people(){
   for(const a of ais())if(a.health<=0){S.agents=S.agents.filter(x=>x!==a);logIt(`${a.name}(${REG[a.region].name})は暮らしが立たず、村を去った。`,'people')}
   const pop=ais();const avgH=pop.reduce((s,a)=>s+a.health,0)/Math.max(1,pop.length);
   if(pop.length<16&&(avgH>75||pop.length<5)&&Math.random()<.1){
-    const r=rnd(Object.keys(REG));const na=newAgent(r,false);S.agents.push(na);
+    const r=rnd(Object.keys(REG));const na=newAgent(r,false);S.agents.push(na);inspire(na);knowBasics(na);
     logIt(`${na.name}が村の噂を聞いて${REG[r].name}に移り住んだ。`,'people');
   }
 }
@@ -568,9 +588,16 @@ function moneyGood(){let g=null,v=0;for(const k of GOODS)if(S.money[k]>v){v=S.mo
 /* ================= プレイヤーの操作 ================= */
 /* 材料をひと通り手にすると、その加工を思いつく(あなたも村人も同じ) */
 function inspire(a){const got=[];
-  for(const r of RECIPES){if(r.auto||a.known.includes(r.id)||(r.needs&&!hasFac(a,r.needs)))continue;
+  for(const r of RECIPES){if(r.auto||r.secret||a.known.includes(r.id)||(r.needs&&!hasFac(a,r.needs)))continue;
     if(Object.keys(r.in).every(g=>cnt(a,g)>0)){a.known.push(r.id);got.push(r)}}
   return got}
+/* 秘伝をひとつ知る。まだ知らないものから選ぶ。誰も知らなければ「村で初めて」 */
+function learnSecret(a,by){const left=SECRETS.filter(r=>!a.known.includes(r.id));if(!left.length)return null;const r=rnd(left);a.known.push(r.id);
+  if(!S.firstBy[r.id])S.firstBy[r.id]=a.isPlayer?'あなた':a.name;if(!a.isPlayer)logIt(`${a.name}が${by}から${ITEMS[r.out].name}の作り方を知ったらしい。`,'tech');return r}
+/* 古い石板: 持っていると、少しずつ刻まれた絵を読み解いて秘伝を知る */
+function readTablets(){for(const a of live()){if(cnt(a,'tablet')<1||Math.random()>.2)continue;const r=learnSecret(a,'古い石板');if(!r||!a.isPlayer)continue;
+  logIt(`あなたは古い石板の絵を読み解き、${ITEMS[r.out].name}の作り方を知った。${r.short}`,'tech');toast(`<b>秘伝!</b> 石板から${ITEMS[r.out].name}の作り方を知った`,'rare',4200)}}
+const secretMsg=r=>`${ITEMS[r.out].name}の作り方(${Object.entries(r.in).map(([g,n])=>ITEMS[g].name+q(g,n)).join('・')})`;
 function unlockHold(P){if(!P.region)return;
   for(const r of inspire(P)){
     if(!S.firstBy[r.id]){S.firstBy[r.id]='あなた';logIt(`あなたが${ITEMS[r.out].name}の作り方を思いついた。村で初めてだ。`,'tech')}
@@ -613,15 +640,15 @@ function propose(){
   logIt(`あなたは${best.a.name}と取引し、${ITEMS[gG].name}${q(gG,best.pay)}で${ITEMS[wG].name}${q(wG,best.get)}を得た。`,'you');
   save();render();
 }
-/* 教えられるのは覚えた道具の型と、2段目からの加工だけ。縄・石刃のような誰でも思いつく物は教えても礼にならない */
-const teachable=id=>isDesign(id)||(!!RID[id]&&!RID[id].auto&&RID[id].tier>=2);
+/* 教えられるのは珍しい素材の道具の型と、2段目からの加工・秘伝だけ。縄・石刃・石の槍のような誰でも思いつく物は教えても礼にならない */
+const teachable=id=>isDesign(id)?!commonDesign(id):!!RID[id]&&!RID[id].auto&&(RID[id].secret||RID[id].tier>=2);
 function teachOffer(rid){
   if(!teachable(rid)||player().labor<1)return;
   const des=isDesign(rid),r=RID[rid];let best=null;
   /* 村で知っている人が多いほど、教わる値打ちは下がる */
   const rare=1-ais().filter(a=>des?a.known.includes(rid):knows(a,rid)).length/Math.max(1,ais().length);
   for(const a of ais()){if(des?a.known.includes(rid):(knows(a,rid)||(r.needs&&!hasFac(a,r.needs))))continue;computeWant(a);
-    let kv=(des?toolUse(a,rid)*.6:Math.max(0,agentVal(a,r.out)-Object.entries(r.in).reduce((s,[g,n])=>s+n*S.prices[g],0))*3)*rare;
+    let kv=(des?toolUse(a,rid)*.6:Math.max(0,recipeOut(a,r)*agentVal(a,r.out)-Object.entries(r.in).reduce((s,[g,n])=>s+n*S.prices[g],0))*3)*rare;
     const pv=kv*.5;if(pv<.5)continue;
     const g=GOODS.filter(g=>surplus(a,g)>.1).sort((x,y)=>S.money[y]-S.money[x]||S.prices[y]-S.prices[x])[0];if(!g)continue;
     const raw=Math.min(surplus(a,g),pv/S.prices[g]*(1+.1*titleLv())),amt=whole(g)?Math.floor(raw):Math.floor(raw*10)/10;if(amt<(whole(g)?1:.1))continue;
@@ -644,8 +671,9 @@ function stepExp(P){const e=S.ui.exp;if(!e||e.done||P.labor<1)return;P.labor--;c
     e.notes.unshift({d:e.depth,t:`${h.t} 体力-${h.d}。慌てて逃げ帰り、荷の半分を落とした。`,cls:'bad'});
     toast(`<b>危ない!</b> ${h.t}`,'bad',3200);finishExp(P,true);return}
   S.stat.expMax=Math.max(S.stat.expMax,e.depth);
-  const o=expOutcome(P,e.depth);e.notes.unshift({d:e.depth,t:o.t,cls:o.rare?'rare':''});
+  const o=expOutcome(P,e.depth);e.notes.unshift({d:e.depth,t:o.t,cls:o.rare||o.secret?'rare':''});
   for(const[g,n]of Object.entries(o.loot||{}))e.loot[g]=r2((e.loot[g]||0)+n);
+  if(o.secret)toast(`<b>秘伝!</b> ${ITEMS[o.secret.out].name}の作り方を知った`,'rare',4000);
   if(o.rare)toast(`<b>奥地で珍品!</b> ${gl(o.rare)} ${RARITY[ITEMS[o.rare].rare]}${ITEMS[o.rare].name}`,'rare',4000);
 }
 function finishExp(P,failed){const e=S.ui.exp;if(!e||e.done)return;e.done=true;e.failed=!!failed;const got=[];
@@ -654,7 +682,7 @@ function finishExp(P,failed){const e=S.ui.exp;if(!e||e.done)return;e.done=true;e
 }
 function expOutcome(P,d){
   if(S.ui.map&&d>=3){S.ui.map=false;const g=rnd(['jade','gold','meteor','pearl']);return{t:`地図の印の場所を掘ると、${ITEMS[g].name}が埋まっていた!`,loot:{[g]:1},rare:g}}
-  const W=[['food',28],['mat',22],['salt',5],['ore',6],['rare1',10+2*d],['rare2',3+1.5*d],['meteor',.3+.5*d],['hint',5],['land',2.5],['none',12]];
+  const W=[['food',28],['mat',22],['salt',5],['ore',6],['rare1',10+2*d],['rare2',3+1.5*d],['meteor',.3+.5*d],['hint',5],['ruin',d>=3?1.5+.5*d:0],['tablet',.6+.4*d],['land',2.5],['none',12]];
   let r=Math.random()*W.reduce((s,x)=>s+x[1],0),k='none';for(const[x,w]of W){if((r-=w)<0){k=x;break}}
   const sc=(.8+Math.random()*.5)*(1+.35*(d-1));
   switch(k){
@@ -664,8 +692,12 @@ function expOutcome(P,d){
     case'ore':{const n=r1(1.2*sc);return{t:`崖の割れ目に緑の筋の入った石。銅鉱石${n}`,loot:{ore:n}}}
     case'rare1':case'rare2':{const g=rnd(k==='rare1'?['obsidian','fossil','amber']:['pearl','gold','jade']);return{t:`${RARITY[ITEMS[g].rare]}${ITEMS[g].name}を見つけた!`,loot:{[g]:1},rare:g}}
     case'meteor':return{t:'焼け焦げた窪みの底に、重く黒い塊。伝説の隕鉄だ!',loot:{meteor:1},rare:'meteor'};
-    case'hint':{const k=giftDesign(P,'旅人');if(!k)return{t:'旅人と焚き火を囲んで話した。体が少し温まった。'};
+    case'hint':{const r=Math.random()<.5?learnSecret(P,'旅人'):null;if(r)return{t:`旅人と焚き火を囲み、遠い村の秘伝を聞いた。${secretMsg(r)}。`,rare:null,secret:r};
+      const k=giftDesign(P,'旅人');if(!k)return{t:'旅人と焚き火を囲んで話した。体が少し温まった。'};
       return{t:`旅人と出会い、「${ITEMS[k].name}」の組み方を教わった。型帳に書き留めた。`}}
+    case'ruin':{const r=learnSecret(P,'岩屋の壁画');if(!r)return{t:'崖の岩屋に古い壁画があった。もう知っていることばかりだ。'};
+      return{t:`崖の岩屋に古い壁画が描かれていた。昔の人の仕事の様子から、${secretMsg(r)}が読み取れた。`,secret:r}}
+    case'tablet':return{t:'倒れた石の下から、絵の刻まれた古い石板が出てきた。持ち帰ってじっくり読み解こう。',loot:{tablet:1},rare:'tablet'};
     case'land':{const free=t=>P.plot.map((p,i)=>i).filter(i=>!P.plot[i].f&&P.plot[i].t===t);const rocks=free('rock'),soils=free('soil');
       if(rocks.length&&Math.random()<.5){P.plot[rnd(rocks)].t='ore';return{t:'帰り道、自分の土地の岩場に銅の鉱脈を見つけた!(岩場が鉱脈になった)'}}
       if(soils.length){P.plot[rnd(soils)].t='river';return{t:'自分の土地の草地から泉が湧き出しているのを見つけた!(川のマスになった)'}}
@@ -689,19 +721,22 @@ function makeCard(type){const P=player();
       const sell1=(g,mk)=>{const p=pickPay(P,S.prices[g]*mk,g);offers.push({g,pay:p&&p.g,amt:p&&p.amt})};
       sell1(rnd(['obsidian','pearl','amber','fossil','gold','jade']),1.3);
       const ex=dkey(rnd(Object.keys(SHAPES)),rnd(['copper','obsidian']),rnd(['short','long']),'rope');registerDesign(ex,'遠い国の商人');if(cnt(P,ex)<1)sell1(ex,1.4);
+      const ls=SECRETS.filter(r=>!P.known.includes(r.id));let sec=null;
+      if(ls.length&&Math.random()<.6){const r=rnd(ls),p=pickPay(P,Math.max(8,S.prices[r.out]*4));sec={rid:r.id,pay:p&&p.g,amt:p&&p.amt}}
       const opts=offers.map((x,i)=>({id:'buy'+i,label:x.pay?`${ITEMS[x.g].name}を買う(${ITEMS[x.pay].name}${q(x.pay,x.amt)})`:`${ITEMS[x.g].name}(払える品がない)`,dis:!x.pay}));
       const sg=GOODS.filter(g=>cnt(P,g)>=1&&!ITEMS[g].rare&&g!=='salt').sort((x,y)=>cnt(P,y)*S.prices[y]-cnt(P,x)*S.prices[x])[0];let sell=null;
       if(sg){const amt=r1(Math.max(1,cnt(P,sg)*.5)),val=amt*S.prices[sg]*2,pay=val>=S.prices.pearl*1.2?'pearl':'salt',pa=pay==='pearl'?Math.floor(val/S.prices.pearl):r1(val/S.prices.salt);
         sell={g:sg,amt,pay,pa};opts.push({id:'sell',label:`${ITEMS[sg].name}${q(sg,amt)}を売る(${ITEMS[pay].name}${q(pay,pa)}と交換)`})}
+      if(sec){const n=ITEMS[RID[sec.rid].out].name;opts.push({id:'secret',label:sec.pay?`${n}の作り方を教わる(${ITEMS[sec.pay].name}${q(sec.pay,sec.amt)})`:`${n}の作り方(払える品がない)`,dis:!sec.pay})}
       opts.push({id:'no',label:'見送る',plain:1});
-      return{type,title:'旅の商人',text:'遠い土地から商人がやって来た。見たことのない品を持ち、この村の品を相場の倍で買うという。商人は今日のうちに去る。',opts,data:{offers,sell}}}
+      return{type,title:'旅の商人',text:`遠い土地から商人がやって来た。見たことのない品を持ち、この村の品を相場の倍で買うという。${sec?'遠い国の作り方も、礼をすれば教えるという。':''}商人は今日のうちに去る。`,opts,data:{offers,sell,sec}}}
     case'traveler':return{type,title:'倒れた旅人',text:'村はずれに旅人が倒れている。ひどく飢えているようだ。見知らぬ土地の話を知っているかもしれない。',opts:[{id:'share',label:'食べ物2を分ける'},{id:'no',label:'見なかったことにする',plain:1}]};
     case'beast':return{type,title:'大きな足跡',text:'見たこともない大きな獣の足跡が、土地のそばに続いている。仕留めれば当分食べ物に困らない。だが相手は手強い。',opts:[{id:'hunt',label:'狩りに出る(労力2・狩りの道具があると有利)',labor:2},{id:'hide',label:'家にこもってやり過ごす',plain:1}]};
     case'drift':return{type,title:'嵐のあとの浜',text:'嵐のあと、浜に何かがたくさん打ち上げられているという噂だ。',opts:[{id:'search',label:'浜を探しに行く(労力1)',labor:1},{id:'no',label:'行かない',plain:1}]};
     case'diviner':return{type,title:'占い師',text:'占い師が村を訪れた。「塩をひとつまみ供えれば、運を授けよう」',opts:[{id:'offer',label:'塩1を供える'},{id:'no',label:'断る',plain:1}]};
     case'festival':{const g=bestStake(P),c=cnt(P,g);const sm=r1(c/4),lg=r1(c/2);
       return{type,title:'祭りの賽',text:`村で祭りが開かれ、賽の目に品物を賭ける遊びが始まった。手元の${ITEMS[g].name}を賭けられる。勝てば倍、大勝ちなら4倍になる。`,
-        opts:[{id:'small',label:`${ITEMS[g].name}${q(g,sm)}を賭ける`},{id:'large',label:`${ITEMS[g].name}${q(g,lg)}を賭ける`},{id:'no',label:'見ているだけにする',plain:1}],data:{g,sm,lg}}}
+        opts:[{id:'small',label:`${ITEMS[g].name}${q(g,sm)}を賭ける`},{id:'large',label:`${ITEMS[g].name}${q(g,lg)}を賭ける`},...(cnt(P,'sake')>=1?[{id:'sake',label:'酒1をふるまう(名声+4)'}]:[]),{id:'no',label:'見ているだけにする',plain:1}],data:{g,sm,lg}}}
     case'map':return{type,title:'地図の切れ端',text:'古い木の皮に描かれた地図の切れ端を拾った。どこかの奥地に印が付いている。',opts:[{id:'ok',label:'大事にしまっておく'}]};
   }
 }
@@ -709,13 +744,17 @@ function resolveCard(id){const c=S.card,P=player();if(!c||c.result)return;const 
   switch(c.type){
     case'merchant':{if(id.startsWith('buy')){const x=c.data.offers[+id.slice(3)];if(cnt(P,x.pay)<x.amt){res='払える品が足りなかった。';break}
         take(P,x.pay,x.amt);if(ITEMS[x.g].rare)gainRare(P,x.g,true);else add(P,x.g,1);res=`${ITEMS[x.pay].name}${q(x.pay,x.amt)}と引き換えに${ITEMS[x.g].name}を手に入れた。${isTool(x.g)?'作りをよく見たので、組み方も型帳に書き留めた。':''}`;kind='good'}
+      else if(id==='secret'){const x=c.data.sec,r=RID[x.rid];if(cnt(P,x.pay)<x.amt){res='払える品が足りなかった。';break}
+        take(P,x.pay,x.amt);if(!P.known.includes(r.id))P.known.push(r.id);if(!S.firstBy[r.id])S.firstBy[r.id]='あなた';
+        res=`${ITEMS[x.pay].name}${q(x.pay,x.amt)}を払い、${secretMsg(r)}を教わった。村ではまだ誰も知らないかもしれない。`;kind='jackpot'}
       else if(id==='sell'){const x=c.data.sell;if(cnt(P,x.g)<x.amt){res='品が足りなかった。';break}take(P,x.g,x.amt);
         if(x.pay==='pearl')for(let i=0;i<x.pa;i++)gainRare(P,'pearl',true);else add(P,'salt',x.pa);res=`${ITEMS[x.g].name}${q(x.g,x.amt)}を売り、${ITEMS[x.pay].name}${q(x.pay,x.pa)}を受け取った。`;kind='good'}
       else res='商人は肩をすくめ、次の村へ去っていった。';break}
     case'traveler':{if(id==='no'){res='見なかったことにした。';break}
       let need=2;for(const g of FOOD){const t=Math.min(cnt(P,g),need);take(P,g,t);need-=t;if(need<=0)break}addFame(3);
-      const r=Math.random();const gk=r<.45?giftDesign(P,'旅人'):null;
-      if(gk){res=`元気を取り戻した旅人は、お礼に「${ITEMS[gk].name}」の組み方を教えてくれた。`;kind='jackpot'}
+      const r=Math.random();const sc=r<.3?learnSecret(P,'旅人'):null;const gk=!sc&&r<.45?giftDesign(P,'旅人'):null;
+      if(sc){res=`元気を取り戻した旅人は、お礼に故郷の秘伝を教えてくれた。${secretMsg(sc)}。`;kind='jackpot'}
+      else if(gk){res=`元気を取り戻した旅人は、お礼に「${ITEMS[gk].name}」の組み方を教えてくれた。`;kind='jackpot'}
       else if(r<.72){const g=rnd(['amber','pearl','jade']);gainRare(P,g,true);res=`旅人は懐から${RARITY[ITEMS[g].rare]}${ITEMS[g].name}を取り出し、お礼にとくれた。`;kind='rare'}
       else res='旅人は何度も礼を言って去っていった。いつか恩が返ってくるかもしれない。';break}
     case'beast':{if(id==='hide'){if(Math.random()<.3){const k=hasFac(P,'granary')?.85:.7;for(const g of FOOD)P.inv[g]=r2(cnt(P,g)*k);res=`夜のうちに獣が食べ物を荒らしていった。食べ物の${hasFac(P,'granary')?'1割半':'3割'}を失った。`;kind='bad'}else res='しばらくして、獣は山へ帰っていった。';break}
@@ -731,7 +770,8 @@ function resolveCard(id){const c=S.card,P=player();if(!c||c.result)return;const 
       else if(r<.92){add(P,'copper',1);res='古い舟の金具を見つけた。銅1!';kind='jackpot'}
       else{res='めぼしい物は何もなかった。';kind='bad'}break}
     case'diviner':{if(id==='no'){res='ご縁がなかった。';break}take(P,'salt',1);P.charm=charmDays();res=`お守りを授かった。${P.charm}日のあいだ、大当たり・珍品・名品・豊穣が出やすくなる。`;kind='jackpot';break}
-    case'festival':{if(id==='no'){res='人々の歓声を聞きながら、見ているだけにした。';break}const g=c.data.g,st=id==='small'?c.data.sm:c.data.lg;if(cnt(P,g)<st){res='賭ける品が足りなかった。';break}
+    case'festival':{if(id==='no'){res='人々の歓声を聞きながら、見ているだけにした。';break}
+      if(id==='sake'){if(cnt(P,'sake')<1){res='酒が足りなかった。';break}take(P,'sake',1);addFame(4);res='酒をふるまうと、祭りはいっそう賑わった。みんながあなたの名を口にしている。';kind='good';break}const g=c.data.g,st=id==='small'?c.data.sm:c.data.lg;if(cnt(P,g)<st){res='賭ける品が足りなかった。';break}
       const r=Math.random();if(r<.08){add(P,g,st*3);res=`大勝ち! ${ITEMS[g].name}${q(g,st*3)}を手にした。`;kind='jackpot'}
       else if(r<.46){add(P,g,st);res=`勝った! ${ITEMS[g].name}${q(g,st)}が増えた。`;kind='good'}
       else{take(P,g,st);res=`負けた。${ITEMS[g].name}${q(g,st)}を失った。`;kind='bad'}break}
@@ -764,7 +804,9 @@ function giveWork(k,who,key,n,val){const w=S.works[k];if(!w||w.done)return;
 function finishWork(k){const w=S.works[k],W=WORKS[k];w.done=S.day;addFame(8);
   const who=Object.entries(w.by).sort((x,y)=>y[1]-x[1]).map(x=>x[0]);
   logIt(`${W.name}が完成した! ${W.effect} 力を貸した人: ${who.slice(0,6).join('・')}${who.length>6?` ほか${who.length-6}人`:''}`,'work');
-  toast(`<b>完成!</b> ${W.name}`,'jackpot',4200)}
+  toast(`<b>完成!</b> ${W.name}`,'jackpot',4200);
+  /* 社が建つと、祀った神から秘伝をひとつ授かる */
+  if(k==='shrine'){const r=learnSecret(player(),'社');if(r){logIt(`社に祈ると、夢枕に神が立ち、${secretMsg(r)}を授けた。`,'tech');toast(`<b>秘伝!</b> ${ITEMS[r.out].name}の作り方を授かった`,'rare',4200)}}}
 /* 名声に数える値打ち。相場で数えるが、基準値の0.5〜1.5倍に収める(安い材料で名声を稼ぎすぎないように、高騰した珍品で跳ね上がらないように) */
 const workVal=(g,n)=>r1(n*Math.min(ITEMS[g].base*1.5,Math.max(ITEMS[g].base*.5,S.prices[g])));
 const rareToGive=P=>RARES.filter(g=>cnt(P,g)>=1).sort((x,y)=>S.prices[x]-S.prices[y])[0];
@@ -1015,6 +1057,7 @@ function renderBench(P){
       <div class="controls"><button class="btn primary" id="wbMake" ${why?'disabled':''}>組み立てる(労力1)</button></div></div>
     <h3>型帳 ${P.known.filter(isDesign).length}</h3><div class="book">${book||'<p class="note">まだ型はない。組み立てた道具の形がここに残り、次からすぐ作れる。</p>'}</div>
     <h3>加工</h3><div class="book">${procs||'<p class="note">素材を手に入れると、加工の仕方を思いつくことがある。</p>'}</div>${teach}
+    <p class="note">秘伝 ${SECRETS.filter(r=>P.known.includes(r.id)).length}/${SECRETS.length}: 材料を持っても思いつかない作り方。遠出・旅人・商人・古い石板などで知ることがあり、教えると礼がもらえる。</p>
     ${others?`<h3>村で使われている道具</h3><p class="note">買うか教わるかすれば、組み方が分かる。</p><div class="rumor">${others}</div>`:''}`;
 }
 function renderCard(P){const c=S.card,el=$('card');if(!c||!P.region||P.health<=0){el.hidden=true;return}el.hidden=false;
@@ -1167,7 +1210,9 @@ document.addEventListener('click',e=>{
 window.addEventListener('resize',()=>S&&drawChart());
 try{window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>S&&drawChart())}catch(e){}
 
-function start(data){S=(data&&data.state)||load();if(!S){freshWorld()}for(const k in(S.designs||{}))defineDesign(k);S.ui.wb=S.ui.wb||{m:'stone',s:'point',h:'long',b:'fiber'};
+function start(data){S=(data&&data.state)||load();if(!S){freshWorld()}for(const k in(S.designs||{}))defineDesign(k);
+  /* 後から足した品物の相場を補う */
+  for(const g of ORDER){if(S.prices[g]==null)S.prices[g]=ITEMS[g].base;if(S.money[g]==null)S.money[g]=.04}S.ui.wb=S.ui.wb||{m:'stone',s:'point',h:'long',b:'fiber'};
   /* 大事業・肩書き・あゆみより前の保存を引き継ぐ。すでに満たしている項目は黙って記録する */
   S.works=S.works||{};S.ayumi=S.ayumi||{};S.seen=S.seen||{};S.stat={...newStat(),...(S.stat||{})};{const P=player();P.fame=P.fame||0;P.title=P.title||0}
   checkAyumi(true);render()}

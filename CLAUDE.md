@@ -72,12 +72,12 @@ docs/PLAYTEST.md    AI のテストプレイの決まりと感想の書式
 
 | 区画 | 主な中身 |
 |---|---|
-| 定義 | `ITEMS`(品物)、`TER`/`REG`(地形・土地)、`GATHER`(採集)、`RECIPES`(加工)、`FAC`(施設)、`WORKS`(村の大事業)、`TITLES`(肩書き)、`EVENTS`/`OMENS`/`RARE_DROP`/`HAZ` |
+| 定義 | `ITEMS`(品物)、`TER`/`REG`(地形・土地)、`GATHER`(採集)、`RECIPES`(加工。`secret:true` は秘伝で、材料を持っても思いつかない)、`SECRETS`、`FAC`(施設)、`WORKS`(村の大事業)、`TITLES`(肩書き)、`EVENTS`/`OMENS`/`RARE_DROP`/`HAZ` |
 | 世界 | `makePlot`(6×4の土地生成)、`newAgent`、`freshWorld` |
 | 所持品・土地 | `cnt`/`add`/`take`、`useTool`(道具1個ごとの耐久 `a.durs[t]` 配列)、`hasFac`、`watered` |
 | 道具の組み立て | `HEAD`/`SHAPES`/`HANDLES`/`BINDS`、`designCalc`(性能の式)、`registerDesign`/`learnDesign`、`bestPower`、`craftDesign` |
 | 仕事 | `gatherInfo`/`doGather`(運の振れ・珍品)、`doField`、`doCraft`(加工)、`doBuild` |
-| 村人の考え方 | `toolUseJobs`/`toolUse`(道具の価値)、`facValue`、`computeWant`(欲しい物)、`agentVal`(主観価値)、`chooseAction`(効用最大の行動)、`aiInvent`/`aiLearn` |
+| 村人の考え方 | `toolUseJobs`/`toolUse`(道具の価値)、`facValue`、`computeWant`(欲しい物)、`agentVal`(主観価値)、`chooseAction`(効用最大の行動)、`aiInvent`/`knowBasics`(基本の型)/`aiLearn`、`inspire`(材料で思いつく)/`learnSecret`/`readTablets`(秘伝) |
 | 交換 | `deficit`/`surplus`、`exchange`、`tryTrade`(物々交換→仲立ち品の順) |
 | 1日の終わり | `endDay`(1日の進行の全手順)、`consume`/`decay`、`updatePrices`、`updateMoney`、`people`、`events`、`needWhy`/`genOffers`(困っている村人だけが声をかける) |
 | プレイヤーの操作 | `chooseRegion`、`acceptOffer`、`propose`、`teachOffer`/`doTeach`、`unlockHold`(素材を持つと加工を思いつく)、`act`(操作の共通ラッパー) |
@@ -101,7 +101,7 @@ docs/PLAYTEST.md    AI のテストプレイの決まりと感想の書式
 
 - **道具の型キー**は `形.素材.柄.結び`(例 `point.stone.long.fiber`)。`dkey()` で作る。柄なしなら結びは常に `none`
 - 道具を増減するときは必ず `add`/`take`/`useTool` を通す(耐久配列がずれる)。sim はずれを検出して `!!` を出す
-- 新しい品物を足したら: `ITEMS` に定義 → 必要なら `GATHER`/`RECIPES`/`RARE_DROP` → 描画は自動で拾われる
+- 新しい品物を足したら: `ITEMS` に定義 → 必要なら `GATHER`/`RECIPES`/`RARE_DROP` → 描画は自動で拾われる。古い保存に無い品の相場は `start` で補う
 - 文言は日本語。プレイヤー視点の言葉を使う(内部用語を画面に出さない)
 - 色は `style.css` の `:root` トークン経由。ライト/ダーク両方で見え方を確認する
 - 保存形式を壊す変更をしたら `KEY` のバージョンを上げる(古い保存は読まずに新しく始める)
